@@ -56,6 +56,14 @@ El TAP publicado es idéntico al aprobado tras las pruebas en Fuse. No contiene 
 
 La prueba de cuatro partidas consecutivas sin anotar, perdiendo las tres vidas y regresando al título, fue superada por el autor.
 
+## Licencias y derechos
+
+- [MIT License (AI-Assisted Edition) — English](LICENSE)
+- [Licencia MIT, edición asistida por IA — castellano](LICENSE_ES.md)
+- [Licencia de recursos gráficos — derechos reservados](LICENCIA_GRAFICOS.md)
+
+El código y las herramientas se publican bajo MIT; las ilustraciones, sprites y logotipos conservan sus derechos por separado.
+
 ## Autoría y derechos
 
 **Tony C. Ware · 2026**. Véanse [derechos del material gráfico](DERECHOS_GRAFICOS.md) y el archivo de licencia del repositorio. El arte gráfico y la identidad del autor no se consideran licenciados libremente por el mero hecho de publicar el código.
