@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="media/caratula-oficial.jpg" width="520" alt="Carátula oficial de HALCONES ESTELARES — Tony C. Ware, ZX Spectrum 48K">
+</p>
+
 # HALCONES ESTELARES
 
 ### ZX Spectrum 48K · Código máquina Z80 · Edición final 1.0
