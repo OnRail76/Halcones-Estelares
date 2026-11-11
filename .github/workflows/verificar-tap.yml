@@ -1,0 +1,32 @@
+name: Verificar y empaquetar HALCONES ESTELARES
+on:
+  push:
+    paths:
+      - "JUEGO/**"
+      - ".github/workflows/verificar-tap.yml"
+  workflow_dispatch:
+jobs:
+  comprobar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Comprobar SHA-256 y preparar ZIP
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib, zipfile
+          original=Path("JUEGO/HALCONES_ESTELARES_FINAL_1_0.tap")
+          expected="fca50d5b7b1b81bbfdf5141853a5a4905568ce660d2d57824162bfe0c4c8e648"
+          data=original.read_bytes()
+          actual=hashlib.sha256(data).hexdigest()
+          assert actual==expected, f"SHA incorrecto: {actual}"
+          assert len(data)==26108, f"TAP inesperado: {len(data)} bytes"
+          Path("dist").mkdir(exist_ok=True)
+          with zipfile.ZipFile("dist/HALCONES_ESTELARES_FINAL_1_0_SOLO_TAP.zip","w",zipfile.ZIP_DEFLATED,compresslevel=9) as z:
+              z.write(original,original.name)
+          print("TAP verificado y ZIP creado:",actual)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HALCONES_ESTELARES_FINAL_1_0_TAP
+          path: dist/HALCONES_ESTELARES_FINAL_1_0_SOLO_TAP.zip
