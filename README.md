@@ -16,7 +16,7 @@ En el vacío aguardan aves cósmicas que solo quieren **invadir, destruir y COME
 
 ## Jugar
 
-**[Descargar el TAP definitivo](JUEGO/HALCONES_ESTELARES_FINAL_1_0.tap?raw=1)** · Para ordenadores **ZX Spectrum 48K** y emuladores compatibles como Fuse.
+**[Descargar ZIP con el juego definitivo](JUEGO/HALCONES_ESTELARES_FINAL_1_0.zip?raw=1)** · [Descargar TAP sin comprimir](JUEGO/HALCONES_ESTELARES_FINAL_1_0.tap?raw=1) · Para ordenadores **ZX Spectrum 48K** y emuladores compatibles como Fuse.
 
 | Control | Acción |
 |---|---|
