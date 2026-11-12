@@ -4,68 +4,66 @@
 
 # HALCONES ESTELARES
 
-### ZX Spectrum 48K · Código máquina Z80 · Edición final 1.0
+**ZX Spectrum 48K · Código máquina Z80 · © 2026 Tony C. Ware**
 
-**© 2026 Tony C. Ware**
+**[DESCARGAR LA VERSIÓN 1.3.2](https://github.com/OnRail76/Halcones-Estelares/releases/tag/v1.3.2)** · [TAP en el repositorio](JUEGO/HALCONES_ESTELARES_1_3_2.tap) · [Código fuente reproducible](fuentes/1.3.2/README.md)
 
-Un arcade de naves de inspiración ochentera: seis oleadas de enemigos, la legendaria **ESF-01**, un escudo de emergencia y el misterioso **MOAI MONOLITH**.
+## 1988. El futuro
 
-## El juego
+La recién formada **Fuerza Espacial Europea**, una facción secreta de los servicios de protección de Europa, detecta señales de radio y pulsos de energía que provienen de **Europa, la luna de Júpiter**.
 
-En **1988, el futuro**, la recién formada *Fuerza Espacial Europea* detecta señales y pulsos de energía procedentes de Europa, la luna de Júpiter. Varias sondas dejan de responder. Es el momento de estrenar el **ESF-01**, el caza espacial más poderoso del mundo.
+Tras perder el contacto con varias sondas enviadas para investigar, llegó el momento de estrenar el **ESF-01**, el caza espacial más poderoso del mundo.
 
-En el vacío aguardan aves cósmicas que solo quieren **invadir, destruir y COMER**. ¿Quién las dirige? Tu misión es descubrirlo y sobrevivir.
+Nadie esperaba lo que se encontraron en el vacío sideral.
 
-**«Sus gritos se oirán en el Cosmos».**
+**Aves cósmicas con el único propósito de invadir, destruir y COMER.**
 
-## Jugar
+¿Pero qué o quién las dirige?
 
-**[Descargar ZIP con el juego definitivo](JUEGO/HALCONES_ESTELARES_FINAL_1_0.zip?raw=1)** · [Descargar TAP sin comprimir](JUEGO/HALCONES_ESTELARES_FINAL_1_0.tap?raw=1) · Para ordenadores **ZX Spectrum 48K** y emuladores compatibles como Fuse.
+Sube a bordo del **ESF-01**, piloto. Es el momento de luchar.
+
+**¡Sus gritos se oirán en el Cosmos!**
+
+## El arcade
+
+Un matamarcianos de acción inmediata: **CROW, HARPY, VULTURE, OSPREY** y el temible **MOAI MONOLITH**. Seis oleadas por fase, tres vidas, escudo de emergencia, récord y escenarios cósmicos que cambian al avanzar.
+
+La versión 1.3.2 reúne el ritmo ajustado a 25 actualizaciones por segundo, diez CROW en la formación inicial, disparos más rápidos y limitados a dos a la vez, cuatro fondos estelares, efectos de sonido mejorados y la melodía del título que suena una sola vez por visita.
+
+## Controles
 
 | Control | Acción |
 |---|---|
-| **O / P** | Mover la ESF-01 a izquierda / derecha |
-| **SPACE** | Disparar; empezar y continuar en las pantallas correspondientes |
-| **A** | Activar el escudo protector |
+| **O / P** | Izquierda / derecha |
+| **ESPACIO** | Disparar, iniciar desde el título |
+| **A / Q** | Escudo |
+| **H** | Pausa / reanudar |
+| **Sinclair 6 / 7 / 0** | Izquierda / derecha / disparo; 8 o 9 para escudo |
+| **Kempston** | Se selecciona al empezar desde el título pulsando FIRE |
 
-El escudo permite moverse y resistir los ataques durante unos segundos; después requiere una recarga completa. El HUD mantiene puntos, vidas y el estado del escudo. Los tres smileys amarillos son la firma visual de las vidas de Tony C. Ware.
+## Descargas y código
 
-## Enemigos oficiales
+- **[Release 1.3.2: juego, fuentes y edición gráfica](https://github.com/OnRail76/Halcones-Estelares/releases/tag/v1.3.2)**.
+- [TAP 1.3.2](JUEGO/HALCONES_ESTELARES_1_3_2.tap) y [ZIP con el TAP](JUEGO/HALCONES_ESTELARES_1_3_2_JUEGO.zip).
+- [Fuentes del Z80 1.3.2](fuentes/1.3.2/README.md) y [historial de mejoras](docs/CAMBIOS_1_3_2.md).
+- [Edición 1.0 original, conservada íntegra](https://github.com/OnRail76/Halcones-Estelares/releases/tag/v1.0).
 
-**CROW · HARPY · VULTURE · OSPREY · MOAI MONOLITH** (jefe final).
-
-Las seis oleadas alternan distintas formaciones y ataques. Tras el enfrentamiento con el jefe, el desafío continúa.
-
-## Documentación
-
-- [Atlas visual — transcripción](docs/ATLAS_VISUAL_TEXTO.md)
-- [Manual de instrucciones — transcripción](docs/MANUAL_INSTRUCCIONES_TEXTO.md)
-- [Memoria creativa y técnica — transcripción](docs/MEMORIA_DE_DESARROLLO_TEXTO.md)
-- [Aprendizajes para futuros proyectos — transcripción](docs/APRENDIZAJES_TEXTO.md)
-- [Historia original](docs/HISTORIA_OFICIAL.md)
-- [Carátulas seleccionadas](docs/CARATULAS_CONFIRMADAS.md)
-- [Comprobar el TAP](JUEGO/SHA256.txt)
-
-Las transcripciones son versiones textuales: las **capturas reales**, los sprites extraídos y las **cinco carátulas ilustradas** forman parte de la edición gráfica independiente. Las portadas son ilustraciones comerciales; no son capturas del juego.
+Los PDF ilustrados anteriores corresponden a la edición **1.0**; el historial de cambios detalla las novedades hasta 1.3.2. Las cinco carátulas originales aprobadas siguen siendo las mismas; **ninguna lleva un número de versión impreso**.
 
 ## Integridad
 
-El TAP publicado es idéntico al aprobado tras las pruebas en Fuse. No contiene modificaciones respecto de la versión 2.8.9 estabilizada. SHA-256:
+TAP 1.3.2 SHA-256:
 
-`fca50d5b7b1b81bbfdf5141853a5a4905568ce660d2d57824162bfe0c4c8e648`
+`456d80834563321eb171b6f52e1f23d7c467b6f330b7b2d9e13eb9894605fe6b`
 
-La prueba de cuatro partidas consecutivas sin anotar, perdiendo las tres vidas y regresando al título, fue superada por el autor.
+El código de esta publicación ha sido reconstruido byte a byte desde un banco fuente limpio. Los tests automatizados son un complemento a las pruebas en Fuse, no una certificación de funcionamiento en hardware físico.
 
-## Licencias y derechos
+## Licencias y créditos
 
-- [MIT License (AI-Assisted Edition) — English](LICENSE)
-- [Licencia MIT, edición asistida por IA — castellano](LICENSE_ES.md)
-- [Licencia de recursos gráficos — derechos reservados](LICENCIA_GRAFICOS.md)
+**© 2026 Tony C. Ware · Dirección y creación del videojuego.** Asistencia IA: OpenAI GPT y Anthropic Claude.
 
-El código y las herramientas se publican bajo MIT; las ilustraciones, sprites y logotipos conservan sus derechos por separado.
+- [Licencia MIT asistida por IA — English](LICENSE)
+- [Licencia MIT asistida por IA — castellano](LICENSE_ES.md)
+- [Recursos gráficos y carátulas — derechos reservados](LICENCIA_GRAFICOS.md)
 
-## Autoría y derechos
-
-**Tony C. Ware · 2026**. Véanse [derechos del material gráfico](DERECHOS_GRAFICOS.md) y el archivo de licencia del repositorio. El arte gráfico y la identidad del autor no se consideran licenciados libremente por el mero hecho de publicar el código.
-
-**La aventura continúa.**
+**¡Sus gritos se oirán en el Cosmos!**

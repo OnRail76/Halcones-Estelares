@@ -1,0 +1,15 @@
+HALCONES ESTELARES — ZX SPECTRUM 48K — EDICIÓN 1.3.2
+© 2026 Tony C. Ware
+
+O/P: MOVER HORIZONTALMENTE. SPACE: DISPARAR.
+A o Q: ESCUDO. H: PAUSA.
+Sinclair: 6/7 mover, 0 disparar, 8 o 9 escudo.
+Joystick Kempston: iniciar desde el título con el botón de fuego para seleccionarlo; si inicias con SPACE, se utiliza teclado. (Controles según banco fuente 1.3.2.)
+
+CROW, HARPY, VULTURE, OSPREY y MOAI MONOLITH.
+Seis oleadas por fase y el enfrentamiento con MOAI MONOLITH.
+
+SHA-256 del TAP:
+456d80834563321eb171b6f52e1f23d7c467b6f330b7b2d9e13eb9894605fe6b
+
+CARGA: Abre el TAP en Fuse configurado como ZX Spectrum 48K.

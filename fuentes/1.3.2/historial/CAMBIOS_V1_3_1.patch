@@ -1,0 +1,2464 @@
+diff -ruN -x __pycache__ -x '*.tap' -x '*.png' -x '*.bin' -x '*.scr' -x '*.gif' -x 'CAMBIOS_V1_3*.patch' HALCONES_ESTELARES_CODIGO_FUENTE_1_3/LEEME_FUENTES_FINAL_1_0.md hal/LEEME_FUENTES_FINAL_1_0.md
+--- HALCONES_ESTELARES_CODIGO_FUENTE_1_3/LEEME_FUENTES_FINAL_1_0.md	2026-11-12 02:45:13.649658153 +0100
++++ hal/LEEME_FUENTES_FINAL_1_0.md	2026-11-12 11:50:38.118227905 +0100
+@@ -1,9 +1,35 @@
+-# HALCONES ESTELARES — Código fuente (edición final 1.0 y versiones 1.1, 1.2 y 1.3)
++# HALCONES ESTELARES — Código fuente (edición final 1.0 y versiones 1.1, 1.2, 1.3 y 1.3.1)
+ 
+ **Autor y dirección:** Tony C. Ware · **Plataforma:** ZX Spectrum 48K · **Lenguaje:** Z80 ensamblador · **Año:** 2026.
+ 
+ Este paquete contiene **los fuentes verdaderos de la V2.8.9 estabilizada**, aprobada y publicada como edición **FINAL 1.0**. No corresponde a la V2.8.4 defectuosa ni a los experimentos de puntuación oculta. Se ha recompilado y comprobado byte a byte.
+ 
++## VERSIÓN 1.3.1: sonido más seguido e insignia que brilla
++
++Parte de la 1.3. El cambio exacto respecto a la 1.3 está en `CAMBIOS_V1_3_1.patch`.
++
++### Sonido (A): dos trozos por tick
++- En el 48K el altavoz lo mueve la CPU, así que el efecto solo puede sonar en el rato que sobra de cada tick: antes, todo al final, y el efecto se oía a ráfagas con huecos de hasta 26-35 ms.
++- Ahora la espera cuenta ese rato libre (`snd_idle`, en unidades de 26 T) y, en la interrupción de mitad de tick, `snd_mid` toca 3/4 de lo que sobró en el tick anterior menos un margen (tope 10 ms, siempre menos de un fotograma). El final del tick sobra eso menos, así que el tiempo total de sonido es el mismo y el juego no va más lento.
++- Medido con reloj de interrupciones real: el silencio más largo dentro de un tick con efecto baja de 26,5 ms a 19,8 ms de mediana y de 35 ms a 20 ms en el 10 % peor; ticks de más de 2 fotogramas: 0-0,5 % (como en la 1.3).
++- La espera ya no usa `DI`/`HALT`: compara `tick_irqs` sin parar, y así ninguna interrupción se pierde cuando el trabajo acaba justo al cambiar de fotograma.
++
++### Sonido (B): efectos rehechos para el beeper troceado
++- Disparo, estallido, impacto en el MOAI (y el de cuando le queda poco) y disparo del MOAI empiezan con un golpe de ruido corto, que es lo que mejor se oye a trozos, y siguen con barridos más cortos. El trino del disparo enemigo, el escudo, la vida extra y los carteles siguen igual.
++
++### Insignia ESF
++- Una franja diagonal cian-amarillo-cian cruza la insignia de esquina a esquina en 0,6 s. Solo cambian atributos (pantalla y sombra), nunca píxeles.
++- Brilla al empezar cada oleada, con la vida extra, cuando el escudo vuelve a estar listo y, si no pasa nada, cada 8 s (`badge_tick`, `badge_shine` en `src/v12_bajo.asm`).
++- Para hacer sitio, las rutinas de los LEDs (`led_*`) pasan a la memoria baja.
++
++### Pruebas
++- `tests/test_v13_galaga.py` añade el trozo de sonido a mitad de tick y el brillo de la insignia.
++- `mini_z80.py` simula la interrupción en la nueva espera; `test_v18_arcade` deja más pasos a la interrupción (puede tocar sonido).
++- Pasa toda la batería salvo los tres antiguos de siempre (`test_v282`, `test_v284` y el final de `test_v283`).
++- Memoria: principal `8000..BF6A` (149 bytes libres), baja `76E0..7EB5` (330 libres).
++
++**SHA-256 del TAP 1.3.1:** `cb45c1889200fb89119093290373329f17b75a45ec43789683d976a3c110f96a` (`HALCONES_ESTELARES_1_3_1.tap`).
++
+ ## VERSIÓN 1.3: disparo a lo Galaga, 10 cuervos y fondos de fase
+ 
+ Parte de la 1.2. El cambio exacto respecto a la 1.2 está en `CAMBIOS_V1_3.patch`.
+diff -ruN -x __pycache__ -x '*.tap' -x '*.png' -x '*.bin' -x '*.scr' -x '*.gif' -x 'CAMBIOS_V1_3*.patch' HALCONES_ESTELARES_CODIGO_FUENTE_1_3/SHA256_TAP_FINAL.txt hal/SHA256_TAP_FINAL.txt
+--- HALCONES_ESTELARES_CODIGO_FUENTE_1_3/SHA256_TAP_FINAL.txt	2026-11-12 02:45:13.657123336 +0100
++++ hal/SHA256_TAP_FINAL.txt	2026-11-12 11:50:38.128025265 +0100
+@@ -1,3 +1,4 @@
++cb45c1889200fb89119093290373329f17b75a45ec43789683d976a3c110f96a  HALCONES_ESTELARES_1_3_1.tap
+ 2dd9b9f442544e8a792db3b747c946fc452404ecdfa0f3d597a445ce4adf36d7  HALCONES_ESTELARES_1_3.tap
+ 014e470ca2462b798242041e7fbc46f5b4eccedeb1756858af38f48695c4934f  HALCONES_ESTELARES_1_2.tap
+ 65b241a332023fc7443991dae611fc070ee68de7555afaa97daf489696b925bb  HALCONES_ESTELARES_1_1.tap
+diff -ruN -x __pycache__ -x '*.tap' -x '*.png' -x '*.bin' -x '*.scr' -x '*.gif' -x 'CAMBIOS_V1_3*.patch' HALCONES_ESTELARES_CODIGO_FUENTE_1_3/build/starter.asm hal/build/starter.asm
+--- HALCONES_ESTELARES_CODIGO_FUENTE_1_3/build/starter.asm	2026-11-12 02:45:26.753829874 +0100
++++ hal/build/starter.asm	2026-11-12 11:50:19.694991620 +0100
+@@ -74,12 +74,33 @@
+ bgd_same_row equ 31721
+ bg_pair equ 31731
+ bg_nibble equ 31767
+-bg_patterns equ 31785
+-bg_0 equ 31801
+-bg_1 equ 31883
+-bg_2 equ 31965
+-bg_3 equ 32047
+-bg_table equ 32129
++snd_budget_set equ 31785
++snd_budget_q equ 31792
++snd_budget_pos equ 31814
++snd_budget_ok equ 31824
++led_frame_tick equ 31839
++led_all equ 31867
++led_sweep equ 31870
++led_frame_clock_store equ 31895
++led_frame_apply equ 31898
++led_colors_ok equ 31910
++led_one equ 31932
++led_write equ 31939
++led_danger equ 31959
++led_danger_loop equ 31966
++led_danger_next equ 31984
++badge_shine equ 31992
++badge_tick equ 32002
++badge_step equ 32018
++badge_row equ 32023
++badge_col equ 32025
++badge_put equ 32049
++bg_patterns equ 32086
++bg_0 equ 32102
++bg_1 equ 32184
++bg_2 equ 32266
++bg_3 equ 32348
++bg_table equ 32430
+ note_hp equ 64776
+ tune_title equ 64812
+ tune_victory equ 64865
+@@ -326,6 +347,7 @@
+  call rush_rest_irq_tick   ; V2.6: 100 physical IRQ ticks per kamikaze regroup.
+  call gameover_irq_tick  ; Three-second GAME OVER input lockout (150 real IRQs).
+  call grace_irq_tick     ; V1.1: invulnerabilidad extra al reaparecer.
++ call snd_mid            ; V1.3: trozo de sonido a mitad de tick (< 1 fotograma).
+ irq_paused:
+  pop hl                  ; Restore HL exactly as interrupted.
+  pop af                  ; Restore A and original flags exactly.
+@@ -875,6 +897,7 @@
+  ret z
+  xor a
+  ld (shield_ready_pending),a
++ call badge_shine           ; V1.3: la insignia brilla
+  call sfx_shield_ready
+  ret
+ 
+@@ -2363,97 +2386,7 @@
+  ld (rush_rest_ticks),a
+  ret
+ 
+-; Three left-rail signal LEDs, sequence top→middle→bottom→middle→top.
+-; Their original bitmap remains immutable: only native 8x8 INK attributes
+-; and private color shadow are changed. No sprite/compositor memory writes.
+-led_frame_tick:
+- ; V1.2: los LEDs del marco informan. MOAI: los tres fijos en rojo. Enemigo
+- ; bajando cerca de la nave: los tres parpadean rapido. Si no, el barrido de
+- ; siempre: verde con el escudo listo, rojo mientras no lo esta.
+- ld a,(wave_stage)
+- cp 3
+- ld a,0x42
+- jr z,led_all
+- call led_danger
+- jr z,led_sweep
+- ld a,(frame_index)
+- and 2
+- ld a,0x42
+- jr nz,led_all
+- ld a,0x02
+-led_all:
+- ld b,a
+- jr led_write
+-led_sweep:
+- ld a,(led_anim_clock)
+- inc a
+- cp 8
+- jp c,led_frame_clock_store
+- xor a
+- ld (led_anim_clock),a
+- ld a,(led_anim_phase)
+- inc a
+- and 3
+- ld (led_anim_phase),a
+- jp led_frame_apply
+-led_frame_clock_store:
+- ld (led_anim_clock),a
+-led_frame_apply:
+- ld bc,0x0242               ; B = apagado, C = encendido (rojo)
+- ld a,(shield_state)
+- or a
+- jr nz,led_colors_ok
+- ld bc,0x0444               ; escudo listo: verde
+-led_colors_ok:
+- call led_write             ; los tres apagados...
+- ld a,(led_anim_phase)      ; ...y se enciende el que toca (0 arriba, 1/3 centro, 2 abajo)
+- ld hl,0x58c0
+- or a
+- jr z,led_one
+- ld hl,0x5a40
+- cp 2
+- jr z,led_one
+- ld hl,0x5980
+-led_one:
+- ld (hl),c
+- ld a,h
+- add a,0x99                 ; $58xx -> $F1xx (sombra privada)
+- ld h,a
+- ld (hl),c
+- ret
+-led_write:                  ; B = atributo para las tres lamparas
+- ld a,b
+- ld (0x58c0),a
+- ld (0x5980),a
+- ld (0x5a40),a
+- ld (0xf1c0),a
+- ld (0xf280),a
+- ld (0xf340),a
+- ret
+-; NZ si algun enemigo vivo (no en explosion ni reagrupado) esta en y>=112.
+-led_danger:
+- ld hl,enemy_slots+1
+- ld a,(enemy_count)       ; V1.2: 10 con los cuervos, 6 en el resto
+- ld b,a
+-led_danger_loop:
+- ld a,(hl)
+- cp 112
+- jr c,led_danger_next
+- inc hl
+- ld a,(hl)
+- dec hl
+- or a
+- jr z,led_danger_next
+- cp 3
+- jr z,led_danger_next
+- cp 5
+- ret nz
+-led_danger_next:
+- ld de,6
+- add hl,de
+- djnz led_danger_loop
+- xor a
+- ret
++; V1.3: las rutinas de los LEDs (led_*) estan ahora en src/v12_bajo.asm.
+ rush_rest_ticks: db 0
+ rush_pause_active: db 0
+ rush_hover_found: db 0
+@@ -5073,18 +5006,22 @@
+ ; Espera a que pasen tick_frames interrupciones desde el ultimo tick: el juego
+ ; avanza siempre a 25 ticks/s, ni mas rapido en escenas ligeras ni a saltos.
+ tick_wait:
+- di
++ xor a                      ; V1.3: el juego ya acabo su trabajo: aqui no
++ ld (snd_mid_ok),a          ; hace falta el trozo de mitad de tick.
++; V1.3: sin DI. Con HALT hacia falta para no dormirse si la IRQ llegaba entre
++; la comprobacion y el HALT; ahora la espera compara tick_irqs con E sin parar
++; (si cambia, vuelve enseguida) y una IRQ nunca se pierde.
++tick_wait_loop:
+  ld a,(tick_irqs)
+  cp tick_frames
+  jr nc,tick_go
+  ld e,a
+- ei
+  call snd_slice              ; V1.2: el efecto suena en el tiempo que sobra.
+- jr tick_wait
++ jr tick_wait_loop
+ tick_go:
+  xor a
+  ld (tick_irqs),a
+- ei
++ call snd_budget_set        ; V1.3: sonido a mitad del tick que empieza.
+  jp snd_tick                 ; V1.2: barrido y segmentos del efecto, 1 vez por tick.
+ 
+ ; IM2 (guarda AF y HL el llamador).
+@@ -5143,6 +5080,7 @@
+  jr nc,sak_reset
+  inc a
+  ld (player_lives),a        ; lives_hud_present dibuja la sonrisa nueva.
++ call badge_shine           ; V1.3: la insignia brilla
+  call sfx_life                ; V1.2: arpegio de vida extra
+ sak_reset:
+  xor a
+@@ -5193,6 +5131,7 @@
+  inc a
+  ld (card_wave),a
+  call hud_phase_draw         ; V1.2: casillas de oleada y numero en el marcador.
++ call badge_shine           ; V1.3: la insignia brilla
+  call sfx_card
+  ld a,0x46
+  jp wave_card_attr
+@@ -5367,6 +5306,11 @@
+ bg_lines equ 0xf0b0
+ bg_k equ 0xf0b1
+ bg_lv equ 0xf0b2      ; V1.2: enemigos en juego (10 cuervos, 6 el resto)
++snd_idle equ 0xf0b4         ; V1.3: rato libre del tick (unidades de 26 T)
++snd_budget equ 0xf0b6       ; V1.3: trozo de sonido para la mitad del tick
++snd_mid_ok equ 0xf0b8       ; V1.3: 1 = el trozo de mitad de tick aun no ha sonado
++badge_pos equ 0xf0b9        ; V1.3: brillo de la insignia ESF (0 = parado)
++badge_timer equ 0xf0ba      ; V1.3: ticks hasta el siguiente brillo
+ ; V1.2: MOAI y luna (rutinas en src/v12_bajo.asm)
+ boss_blocks equ 0xf0a0      ; bloques del MOAI que quedan por derrumbar (0 = sin empezar)
+ boss_bidx equ 0xf0a1        ; bloque siguiente (0..65), avanza de 37 en 37
+@@ -5918,6 +5862,8 @@
+  ret
+ 
+ ; Toca el efecto en curso hasta que tick_irqs deje de valer E (o espera).
++; V1.3: el rato que se pasa aqui se cuenta en snd_idle (unidades de 26 T) para
++; saber cuanto sobra en cada tick y tocar parte a mitad de tick (snd_mid).
+ snd_slice:
+  ld a,(snd_left)
+  or a
+@@ -5934,6 +5880,20 @@
+  ld a,(tick_irqs)
+  ld e,a
+ tone_half:
++ call snd_half
++ push hl
++ ld bc,(snd_idle)
++ add hl,bc
++ ld bc,8                    ; lo que cuesta cada media onda ademas del retardo
++ add hl,bc
++ ld (snd_idle),hl
++ pop hl
++ ld a,(tick_irqs)
++ cp e
++ jr z,tone_half
++ ret
++; Media onda: HL = semiperiodo. Conserva HL y DE.
++snd_half:
+  ld a,(snd_play_mode)
+  or a
+  jr z,tone_square
+@@ -5958,15 +5918,64 @@
+  ld a,b
+  or c
+  jr nz,tone_delay
+- ld a,(tick_irqs)
+- cp e
+- jr z,tone_half
+  ret
++; Sin efecto: espera contando (antes HALT) para medir el rato libre.
+ snd_rest:
++ push hl
++snd_rest_loop:
+  ld a,(tick_irqs)
+  cp e
++ jr nz,snd_rest_end
++ ld hl,(snd_idle)
++ inc hl
++ inc hl
++ inc hl
++ ld (snd_idle),hl
++ jr snd_rest_loop
++snd_rest_end:
++ pop hl
++ ret
++
++; V1.3: desde la interrupcion de mitad de tick (tick_irqs pasa a 1) toca la
++; mitad de lo que sobro en el tick anterior (snd_budget). Asi el efecto suena
++; dos veces por tick y los huecos de silencio son la mitad de largos, sin
++; gastar mas tiempo del que ya sobraba. Conserva todo salvo AF y HL.
++snd_mid:
++ ld a,(snd_mid_ok)
++ or a
++ ret z
++ ld a,(tick_irqs)
++ dec a
+  ret nz
+- halt
++ ld (snd_mid_ok),a          ; una vez por tick
++ ld a,(snd_left)
++ or a
++ ret z
++ ld a,(snd_mode)
++ cp 2
++ ret z
++ ld (snd_play_mode),a
++ push bc
++ push de
++ ld de,(snd_budget)
++ ld hl,(snd_idle)           ; cuenta como rato libre del tick (el final
++ add hl,de                  ; del tick sobrara eso menos)
++ ld (snd_idle),hl
++ ld hl,(snd_hp)
++snd_mid_loop:
++ call snd_half
++ ex de,hl
++ or a
++ sbc hl,de
++ jr c,snd_mid_end
++ ld bc,8
++ sbc hl,bc
++ jr c,snd_mid_end
++ ex de,hl
++ jr snd_mid_loop
++snd_mid_end:
++ pop de
++ pop bc
+  ret
+ 
+ ; MUSICA: tune = pares (nota 1..18, fotogramas); nota 0 = silencio; 255 = fin.
+@@ -6032,7 +6041,7 @@
+ music_rest:
+  ld a,(tick_irqs)
+  ld e,a
+- jr snd_rest
++ jp snd_rest
+ 
+ ; Llamadas de efecto (sustituyen a los clics de la 1.1).
+ sfx_shot:
+@@ -6071,28 +6080,40 @@
+  jp sfx_start
+ 
+ ; efectos: prioridad, segmentos (semiperiodo, delta, ticks, modo), fin
++; V1.3: rehechos para el beeper troceado (suena a rafagas, dos por tick): golpe
++; de ruido al principio, que es lo que mejor se oye a trozos, y barridos cortos.
+ fx_shot: db 1
+- dw 34
+- db 26,5,0
++ dw 5
++ db 0,1,1                   ; chasquido
++ dw 28
++ db 22,3,0                  ; piu que cae
+  dw 0
+ fx_enemy_fire: db 1
+- dw 80
+- db 246,3,0
++ dw 90
++ db 242,3,0                 ; trino que sube
+  dw 0
+ fx_boss_fire: db 2
+- dw 230
+- db 20,4,0
++ dw 60
++ db 0,1,1                   ; soplido
++ dw 260
++ db 24,3,0                  ; disparo grave
+  dw 0
+ fx_explode: db 2
+- dw 14
+- db 7,7,1
++ dw 4
++ db 0,2,1                   ; estallido
++ dw 18
++ db 6,6,1                   ; retumbo que se apaga
+  dw 0
+ fx_boss_hit: db 2
+- dw 320
+- db 40,3,0
++ dw 30
++ db 0,1,1                   ; golpe en la piedra
++ dw 340
++ db 40,2,0
+  dw 0
+ fx_boss_hit_low: db 2
+- dw 120
++ dw 12
++ db 0,1,1                   ; la piedra cruje (le queda poco)
++ dw 140
+  db 30,3,0
+  dw 0
+ fx_shield_on: db 3
+diff -ruN -x __pycache__ -x '*.tap' -x '*.png' -x '*.bin' -x '*.scr' -x '*.gif' -x 'CAMBIOS_V1_3*.patch' HALCONES_ESTELARES_CODIGO_FUENTE_1_3/build/starter.sym.json hal/build/starter.sym.json
+--- HALCONES_ESTELARES_CODIGO_FUENTE_1_3/build/starter.sym.json	2026-11-12 02:45:26.878926542 +0100
++++ hal/build/starter.sym.json	2026-11-12 11:50:19.820301580 +0100
+@@ -75,12 +75,33 @@
+   "bgd_same_row": 31721,
+   "bg_pair": 31731,
+   "bg_nibble": 31767,
+-  "bg_patterns": 31785,
+-  "bg_0": 31801,
+-  "bg_1": 31883,
+-  "bg_2": 31965,
+-  "bg_3": 32047,
+-  "bg_table": 32129,
++  "snd_budget_set": 31785,
++  "snd_budget_q": 31792,
++  "snd_budget_pos": 31814,
++  "snd_budget_ok": 31824,
++  "led_frame_tick": 31839,
++  "led_all": 31867,
++  "led_sweep": 31870,
++  "led_frame_clock_store": 31895,
++  "led_frame_apply": 31898,
++  "led_colors_ok": 31910,
++  "led_one": 31932,
++  "led_write": 31939,
++  "led_danger": 31959,
++  "led_danger_loop": 31966,
++  "led_danger_next": 31984,
++  "badge_shine": 31992,
++  "badge_tick": 32002,
++  "badge_step": 32018,
++  "badge_row": 32023,
++  "badge_col": 32025,
++  "badge_put": 32049,
++  "bg_patterns": 32086,
++  "bg_0": 32102,
++  "bg_1": 32184,
++  "bg_2": 32266,
++  "bg_3": 32348,
++  "bg_table": 32430,
+   "note_hp": 64776,
+   "tune_title": 64812,
+   "tune_victory": 64865,
+@@ -111,496 +132,485 @@
+   "frame_index": 33163,
+   "irq_im2_install": 33164,
+   "irq_im2_handler": 33196,
+-  "irq_paused": 33220,
+-  "title_screen_show": 33225,
++  "irq_paused": 33223,
++  "title_screen_show": 33228,
+   "lz_src": 61514,
+-  "lz_unpack": 33231,
+-  "lz_match": 33245,
+-  "lz_far": 33263,
+-  "lz_copy": 33277,
+-  "title_screen_wait": 33290,
+-  "title_wait_release": 33314,
+-  "title_wait_press": 33322,
+-  "title_wait_start_release": 33342,
+-  "title_pulse_tick": 33349,
+-  "title_pulse_restore": 33390,
+-  "title_pulse_restore_bit": 33393,
+-  "title_pulse_restore_skip": 33398,
+-  "title_pulse_white": 33422,
+-  "title_pulse_white_bit": 33426,
+-  "title_pulse_white_next": 33438,
+-  "title_pulse_done": 33450,
++  "lz_unpack": 33234,
++  "lz_match": 33248,
++  "lz_far": 33266,
++  "lz_copy": 33280,
++  "title_screen_wait": 33293,
++  "title_wait_release": 33317,
++  "title_wait_press": 33325,
++  "title_wait_start_release": 33345,
++  "title_pulse_tick": 33352,
++  "title_pulse_restore": 33393,
++  "title_pulse_restore_bit": 33396,
++  "title_pulse_restore_skip": 33401,
++  "title_pulse_white": 33425,
++  "title_pulse_white_bit": 33429,
++  "title_pulse_white_next": 33441,
++  "title_pulse_done": 33453,
+   "pulse_mask": 61552,
+-  "title_pulse_times": 33455,
+-  "title_pulse_countdown": 33459,
+-  "title_pulse_phase": 33460,
+-  "gameover_irq_tick": 33461,
+-  "gameover_enter": 33477,
+-  "gameover_tune": 33514,
+-  "gameover_wait_3_seconds": 33520,
+-  "gameover_wait_release": 33537,
+-  "gameover_wait_press": 33545,
+-  "gameover_screen_show": 33556,
+-  "gameover_prompt_show": 33565,
+-  "gameover_prompt_cell": 33572,
+-  "gameover_score_draw": 33577,
+-  "gameover_digit_draw": 33625,
+-  "gameover_glyph_advance": 33641,
+-  "gameover_glyph_found": 33644,
+-  "gameover_digit_row": 33652,
+-  "gameover_mode": 33697,
+-  "gameover_timer": 33698,
+-  "go_col": 33700,
+-  "go_y": 33701,
+-  "go_glyph": 33702,
+-  "phase_interlude_enter": 33704,
+-  "phase_interlude_wait": 33735,
+-  "phase_screen_show": 33773,
+-  "phase_number_draw": 33782,
+-  "phase_divide10": 33787,
+-  "phase_tens_done": 33796,
+-  "phase_number": 33814,
+-  "phase_units": 33815,
+-  "combat_init": 33816,
+-  "combat_tick": 33971,
+-  "animation_wings_up": 34063,
+-  "combat_last_death_freeze": 34091,
+-  "color_shadow_init": 34157,
+-  "color_shadow_present": 34169,
+-  "color_old_pair_loop": 34181,
+-  "color_old_pair_next": 34201,
+-  "color_present_bullets": 34260,
+-  "color_bullet_loop": 34262,
+-  "color_bullet_next": 34286,
+-  "color_present_shield_old": 34295,
+-  "color_present_shield_new": 34310,
+-  "color_present_shield": 34322,
+-  "color_present_six": 34333,
+-  "color_present_six_loop": 34337,
+-  "color_present_enemy": 34350,
+-  "color_present_ship": 34368,
+-  "color_ship_width_ok": 34381,
+-  "color_present_box": 34387,
+-  "color_box_width_ok": 34411,
+-  "color_box_height_ok": 34438,
+-  "color_box_row5": 34497,
+-  "color_box_row4": 34517,
+-  "color_box_row3": 34535,
+-  "color_box_row2": 34551,
+-  "color_box_row1": 34565,
+-  "color_box_next_row": 34577,
+-  "color_rect_w": 34589,
+-  "color_rect_h": 34590,
+-  "color_col": 34591,
+-  "color_row": 34592,
+-  "wave_unpaint_old": 34593,
+-  "wave_unpaint_loop": 34601,
+-  "wave_paint_new": 34619,
+-  "wave_paint_loop": 34627,
+-  "paint_enemy_attr_ix": 34654,
+-  "paint_enemy_rows": 34690,
+-  "paint_enemy_cols": 34692,
+-  "ship_attr_plot": 34706,
+-  "ship_paint_cockpit": 34742,
+-  "ship_paint_engines": 34776,
+-  "player_unpaint_old": 34857,
+-  "player_paint_new": 34887,
+-  "player_paint_live": 34906,
+-  "ship_attr_x": 34936,
+-  "ship_attr_y": 34937,
+-  "ship_attr_ink": 34938,
+-  "player_paint_explosion": 34939,
+-  "composite_update": 34956,
+-  "composite_restore_old": 34993,
+-  "co_re_e": 35001,
+-  "co_re_enemy_b": 35019,
+-  "co_re_b": 35037,
+-  "composite_present_old": 35109,
+-  "co_pre_b": 35115,
+-  "co_pre_enemy_b": 35133,
+-  "composite_present_new": 35149,
+-  "co_prn_b": 35158,
+-  "co_prn_enemy_b": 35176,
+-  "composite_present_enemy_pairs": 35189,
+-  "co_union_loop": 35201,
+-  "comp_present_enemy_pair": 35216,
+-  "co_changed": 35233,
+-  "co_union_wide": 35318,
+-  "co_union_y": 35325,
+-  "co_old_x": 35347,
+-  "co_present_fallback": 35348,
+-  "co_present_new_only": 35351,
+-  "comp_present_ship_union": 35363,
+-  "cps_same_x": 35413,
+-  "cps_right": 35427,
+-  "cps_left": 35441,
+-  "cps_y": 35452,
+-  "cps_moved_up": 35476,
+-  "comp_present_shield_pair": 35491,
+-  "cps_fallback": 35549,
+-  "comp_restore_enemy_ix": 35599,
+-  "comp_present_enemy_ix": 35610,
+-  "enemy_box_ix": 35621,
+-  "enemy_unchanged": 35660,
+-  "enemy_rect_ix": 35681,
+-  "comp_restore_bullet_ix": 35700,
+-  "comp_present_bullet_ix": 35718,
+-  "bullet_rect_dest": 35733,
+-  "enemy_palettes": 35767,
+-  "old_anim_phase": 35771,
+-  "anim_phase": 35772,
+-  "draw_anim_phase": 35773,
+-  "enemy_paint_color": 35774,
+-  "old_enemy_slots": 35775,
+-  "old_bullet_slots": 35835,
+-  "combat_render": 35841,
+-  "player_respawn_tick": 35891,
+-  "player_draw": 35931,
+-  "player_draw_live": 35954,
+-  "player_flame_ready": 35998,
+-  "player_draw_death": 36072,
+-  "ship_blast_second": 36084,
+-  "ship_blast_third": 36093,
+-  "ship_blast_ready": 36096,
+-  "player_keys": 36124,
+-  "player_left_step": 36154,
+-  "player_no_left": 36159,
+-  "player_right_step": 36183,
+-  "player_no_right": 36188,
+-  "player_fire": 36192,
+-  "player_fire_live": 36212,
+-  "player_find_slot": 36242,
+-  "player_slot_found": 36257,
+-  "player_fire_release": 36281,
+-  "wave_update": 36286,
+-  "wave_advance_stage": 36322,
+-  "wave_stage_store": 36340,
+-  "wave_spawn": 36343,
+-  "wave_spawn_now": 36346,
+-  "wave_spawn_copy": 36365,
+-  "wave_spawn_count": 36383,
+-  "wave_update_live": 36410,
+-  "wave_move_loop": 36430,
+-  "wave_move_live": 36455,
+-  "wave_speed_ready_v25": 36498,
+-  "wave_end_bird": 36536,
+-  "wave_rush_reenter": 36543,
+-  "wave_rush_hover": 36558,
+-  "wave_skip_vertical": 36587,
+-  "wave_stage_clock_ready": 36611,
+-  "wave_kamikaze_threshold": 36628,
+-  "wave_steer_left": 36658,
+-  "wave_curve_motion": 36671,
+-  "wave_move_next": 36693,
+-  "wave_check_live": 36716,
+-  "wave_rush_regroup": 36728,
+-  "wave_rush_scan": 36746,
+-  "wave_rush_scan_next": 36765,
+-  "wave_rush_check_clock": 36795,
+-  "wave_rush_release_loop": 36812,
+-  "wave_rush_release_next": 36824,
+-  "rush_rest_irq_tick": 36832,
+-  "led_frame_tick": 36842,
+-  "led_all": 36867,
+-  "led_sweep": 36870,
+-  "led_frame_clock_store": 36895,
+-  "led_frame_apply": 36898,
+-  "led_colors_ok": 36910,
+-  "led_one": 36932,
+-  "led_write": 36939,
+-  "led_danger": 36959,
+-  "led_danger_loop": 36966,
+-  "led_danger_next": 36984,
+-  "rush_rest_ticks": 36992,
+-  "rush_pause_active": 36993,
+-  "rush_hover_found": 36994,
+-  "led_anim_clock": 36995,
+-  "led_anim_phase": 36996,
+-  "hunter_wave_update": 36997,
+-  "hunter_drift_store": 37030,
+-  "hunter_check_pair_launch": 37033,
+-  "hunter_try_launch_v25": 37047,
+-  "hunter_after_launch_v25": 37057,
+-  "hunter_w_loop": 37069,
+-  "hunter_w_store_y": 37106,
+-  "hunter_w_sway": 37109,
+-  "hunter_w_explosion": 37140,
+-  "hunter_w_dive": 37157,
+-  "hunter_w_target_left": 37187,
+-  "hunter_w_target_ready": 37190,
+-  "hunter_w_approach_right": 37208,
+-  "hunter_w_turnback": 37215,
+-  "hunter_w_return": 37222,
+-  "hunter_return_home_y_ok": 37236,
+-  "hunter_w_return_y": 37254,
+-  "hunter_w_rejoin": 37260,
+-  "hunter_w_next": 37270,
+-  "hunter_pair_launch": 37306,
+-  "hunter_single_launch": 37338,
+-  "hunter_single_find": 37348,
+-  "hunter_single_ready": 37365,
+-  "hunter_single_min_ok": 37381,
+-  "hunter_single_max_ok": 37388,
+-  "hunter_pair_try_row": 37401,
+-  "hunter_pair_lower": 37416,
+-  "hunter_pair_ready": 37422,
+-  "hunter_target_min_ok": 37452,
+-  "hunter_target_max_ok": 37459,
+-  "hunter_left_slot_ready": 37491,
+-  "hunter_pair_fire": 37509,
+-  "hunter_fire_left_ready": 37545,
+-  "hunter_single_fire": 37556,
+-  "hunter_single_fire_slot": 37571,
+-  "hunter_single_fire_ready": 37575,
+-  "hunter_fire_one": 37578,
+-  "hunter_fire_find": 37590,
+-  "hunter_fire_spawn": 37605,
+-  "hunter_pair_completion": 37632,
+-  "hunter_left_check": 37657,
+-  "hunter_single_completion": 37690,
+-  "hunter_single_complete_slot": 37705,
+-  "hunter_single_completion_check": 37709,
+-  "crow_wave_update": 37728,
+-  "crow_select_scout": 37746,
+-  "crow_scout_selected": 37764,
+-  "crow_wave_movement": 37768,
+-  "crow_wave_loop": 37776,
+-  "crow_move_across": 37824,
+-  "crow_scout_dive": 37850,
+-  "crow_scout_left": 37887,
+-  "crow_scout_turn": 37900,
+-  "crow_scout_return": 37907,
+-  "crow_scout_home": 37930,
+-  "crow_scout_joins": 37933,
+-  "crow_explosion_tick": 37943,
+-  "crow_wave_next": 37957,
+-  "wave_draw": 37980,
+-  "wave_draw_loop": 37994,
+-  "enemy_draw_ix": 38007,
+-  "enemy_kind_raptor": 38050,
+-  "enemy_kind_falcon": 38066,
+-  "enemy_kind_crow": 38082,
+-  "crow_sprite_ready": 38094,
+-  "enemy_draw_explosion": 38126,
+-  "enemy_kind_ready": 38148,
+-  "bullet_update": 38177,
+-  "bullet_update_loop": 38183,
+-  "bullet_continue": 38206,
+-  "bullet_check_enemy": 38227,
+-  "bullet_no_hit": 38285,
+-  "bullet_check_done": 38298,
+-  "bullet_check_boss": 38302,
+-  "boss_bullet_hit_score": 38355,
+-  "bullet_next": 38364,
+-  "bullet_draw_all": 38375,
+-  "bullet_draw_loop": 38381,
+-  "bullet_draw_ix": 38394,
+-  "bullet_draw_with": 38397,
+-  "digit_bitmaps": 38424,
+-  "wave_initial": 38494,
+-  "wave_hunters": 38554,
+-  "wave_rush": 38614,
+-  "wave_cycle": 38674,
+-  "wave_repeat": 38675,
+-  "hunter_pair_active": 38676,
+-  "hunter_drift": 38677,
+-  "hunter_pair_turn": 38678,
+-  "hunter_pair_left_index": 38679,
+-  "hunter_attack_cooldown": 38680,
+-  "hunter_sway_bias": 38681,
+-  "hunter_target_left": 38682,
+-  "hunter_target_right": 38683,
+-  "hunter_slot_index": 38684,
+-  "ship_old_x": 38685,
+-  "ship_old_y": 38686,
+-  "ship_new_x": 38687,
+-  "ship_new_y": 38688,
+-  "ship_x": 38689,
+-  "ship_y": 38690,
+-  "fire_held": 38691,
+-  "player_respawn_pending": 38692,
+-  "kills": 38693,
+-  "wave_done": 38694,
+-  "wave_stage": 38695,
+-  "enemy_slots": 38696,
+-  "bullet_slots": 38756,
+-  "shield_init": 38762,
+-  "shield_irq_tick": 38823,
+-  "shield_irq_state": 38833,
+-  "shield_irq_segment_37": 38869,
+-  "shield_irq_segment_done": 38877,
+-  "shield_irq_store_sub": 38890,
+-  "shield_irq_expiry": 38893,
+-  "shield_irq_ready": 38919,
+-  "shield_try_activate": 38929,
+-  "shield_key_release": 38973,
+-  "shield_collisions": 38978,
+-  "shield_bird_loop": 38992,
+-  "shield_bird_next": 39050,
+-  "enemy_bullet_update": 39059,
+-  "enemy_bullet_move_loop": 39065,
+-  "eb_hitbox": 39109,
+-  "enemy_bullet_remove": 39148,
+-  "enemy_bullet_next": 39152,
+-  "enemy_fire_countdown": 39172,
+-  "enemy_fire_due": 39183,
+-  "enemy_fire_period": 39201,
+-  "enemy_fire_period_ok": 39217,
+-  "enemy_fire_period_set": 39218,
+-  "enemy_bullet_find": 39227,
+-  "enemy_bullet_free": 39241,
+-  "enemy_shooter_turn_ok": 39264,
+-  "enemy_shooter_offset": 39274,
+-  "enemy_shooter_start": 39278,
+-  "enemy_bullet_bird": 39285,
+-  "enemy_bullet_shooter_next": 39295,
+-  "enemy_shooter_no_wrap": 39312,
+-  "enemy_shooter_advance": 39317,
+-  "enemy_bullet_spawn": 39323,
+-  "boss_bullet_spawn": 39350,
+-  "boss_bullet_left": 39364,
+-  "enemy_bullet_draw_all": 39382,
+-  "enemy_bullet_draw_loop": 39388,
+-  "enemy_bullet_draw_next": 39395,
+-  "ship_hit_collisions": 39404,
+-  "ship_hit_bird_loop": 39426,
+-  "ship_hit_bird_next": 39490,
+-  "player_take_hit": 39499,
+-  "shield_color_unpaint": 39533,
+-  "shield_color_paint": 39538,
+-  "shield_color_apply": 39543,
+-  "shield_state": 39611,
+-  "shield_key_held": 39612,
+-  "shield_previous_state": 39613,
+-  "shield_frame_state": 39614,
+-  "shield_timer": 39615,
+-  "shield_charge_frame": 39617,
+-  "shield_meter": 39618,
+-  "shield_meter_displayed": 39619,
+-  "shield_ready_pending": 39620,
+-  "shield_invulnerable": 39621,
+-  "player_lives": 39622,
+-  "lives_displayed": 39623,
+-  "shield_outline_color": 39624,
+-  "shot_spawn_turn": 39625,
+-  "shot_shooter_index": 39626,
+-  "old_enemy_bullets": 39627,
+-  "enemy_bullet_slots": 39636,
+-  "boss_start": 39645,
+-  "boss_row": 39679,
+-  "boss_scene_sync": 39736,
+-  "boss_scene_screen_row": 39751,
+-  "boss_palette_white": 39788,
+-  "boss_palette_red": 39793,
+-  "boss_palette_apply": 39798,
+-  "boss_white_attr_row": 39809,
+-  "boss_white_attr_col": 39815,
+-  "boss_eye_tick": 39833,
+-  "boss_eye_apply": 39857,
+-  "boss_update": 39870,
+-  "boss_flash_red": 39897,
+-  "boss_erase_start": 39901,
+-  "boss_cycle_keep": 39944,
+-  "boss_phase_count_done": 39958,
+-  "boss_planet_install": 39974,
+-  "boss_planet_erase": 39988,
+-  "boss_planet_blit": 39995,
+-  "planet_bitmap_row": 40000,
+-  "planet_blank_row": 40041,
+-  "planet_blank_byte": 40044,
+-  "planet_next_row": 40048,
+-  "boss_planet_palette_cyan": 40060,
+-  "boss_planet_palette_white": 40065,
+-  "boss_planet_palette_apply": 40067,
+-  "planet_attr_row": 40078,
+-  "planet_attr_col": 40081,
+-  "planet_source": 40102,
+-  "planet_mode": 40104,
+-  "planet_y": 40105,
+-  "planet_ink": 40106,
+-  "boss_hp": 40107,
+-  "boss_death_left": 40108,
+-  "boss_ink": 40109,
+-  "boss_y": 40110,
+-  "boss_src": 40111,
+-  "beep_enemy_destroy": 40113,
+-  "beep_enemy_blip_cycle": 40115,
+-  "beep_enemy_blip_high": 40121,
+-  "beep_enemy_blip_low": 40128,
+-  "beep_player_death": 40134,
+-  "sfx_death_noise_burst": 40139,
+-  "sfx_death_noise_next": 40141,
+-  "beep_boss_destroy": 40161,
+-  "sfx_boss_rumble_outer": 40166,
+-  "sfx_boss_rumble_inner": 40168,
+-  "sprite_render": 40188,
+-  "spr_dest": 40242,
+-  "sprite_row2": 40267,
+-  "sprite_row2_n": 40298,
+-  "sprite_row3": 40301,
+-  "sprite_row3_n": 40337,
+-  "sprite_row4": 40340,
+-  "sprite_row4_n": 40381,
+-  "sprite_row5": 40384,
+-  "sprite_row5_n": 40430,
+-  "spr_data": 40433,
+-  "spr_x": 40435,
+-  "spr_y": 40436,
+-  "spr_cols": 40437,
+-  "spr_height": 40438,
+-  "compositor_init": 40439,
+-  "composite_setup": 40462,
+-  "composite_mul": 40480,
+-  "composite_skip": 40488,
+-  "sprite_fits": 40490,
+-  "sprite_fits_no": 40506,
+-  "sprite_restore": 40509,
+-  "rest_row2": 40540,
+-  "rest_row3": 40577,
+-  "rest_row4": 40616,
+-  "rest_row5": 40657,
+-  "sprite_present": 40700,
+-  "pres_row2": 40728,
+-  "pres_row3": 40765,
+-  "pres_row4": 40804,
+-  "pres_row5": 40845,
+-  "compositor_scrub": 40888,
+-  "scrub_row": 40893,
+-  "scrub_advance": 40928,
+-  "scrub_y": 40942,
+-  "scrub_rows_left": 40943,
+-  "stars_v13_init": 40944,
+-  "stars_v13_erase_old": 40956,
+-  "stars_v11_clear_loop": 40976,
+-  "stars_v11_sky_bit": 41013,
+-  "stars_v13_move": 41014,
+-  "stars_v13_move_loop": 41019,
+-  "stars_v13_rate_mid": 41044,
+-  "stars_v13_rate_slow": 41052,
+-  "stars_v13_move_wrap": 41056,
+-  "stars_v13_move_store": 41063,
+-  "stars_v13_select_bank": 41071,
+-  "stars_v13_select_first": 41098,
+-  "stars_v13_cache_rebuild": 41117,
+-  "stars_v13_cache_loop": 41127,
+-  "stars_v13_screen_addr": 41160,
+-  "stars_v13_cache_rebuild_half": 41186,
+-  "stars_v11_rebuild_loop": 41195,
+-  "stars_v13_masks_init": 41232,
+-  "stars_v13_mask_init_loop": 41242,
+-  "stars_v13_draw_all": 41270,
+-  "stars_v11_draw_loop": 41275,
+-  "stars_v13_present_all": 41289,
+-  "stars_v13_present_old": 41295,
+-  "stars_v13_present_new": 41303,
+-  "stars_v13_present_initial": 41311,
+-  "stars_v13_sync_loop": 41319,
+-  "stars_v13_active_stars": 41339,
+-  "stars_v13_active_cache": 41341,
+-  "stars_v13_active_previous": 41343,
+-  "stars_v13_cache": 41345,
+-  "stars_v13_previous": 41441,
+-  "arcade_screen_clear": 41537,
++  "title_pulse_times": 33458,
++  "title_pulse_countdown": 33462,
++  "title_pulse_phase": 33463,
++  "gameover_irq_tick": 33464,
++  "gameover_enter": 33480,
++  "gameover_tune": 33517,
++  "gameover_wait_3_seconds": 33523,
++  "gameover_wait_release": 33540,
++  "gameover_wait_press": 33548,
++  "gameover_screen_show": 33559,
++  "gameover_prompt_show": 33568,
++  "gameover_prompt_cell": 33575,
++  "gameover_score_draw": 33580,
++  "gameover_digit_draw": 33628,
++  "gameover_glyph_advance": 33644,
++  "gameover_glyph_found": 33647,
++  "gameover_digit_row": 33655,
++  "gameover_mode": 33700,
++  "gameover_timer": 33701,
++  "go_col": 33703,
++  "go_y": 33704,
++  "go_glyph": 33705,
++  "phase_interlude_enter": 33707,
++  "phase_interlude_wait": 33738,
++  "phase_screen_show": 33776,
++  "phase_number_draw": 33785,
++  "phase_divide10": 33790,
++  "phase_tens_done": 33799,
++  "phase_number": 33817,
++  "phase_units": 33818,
++  "combat_init": 33819,
++  "combat_tick": 33974,
++  "animation_wings_up": 34066,
++  "combat_last_death_freeze": 34094,
++  "color_shadow_init": 34163,
++  "color_shadow_present": 34175,
++  "color_old_pair_loop": 34187,
++  "color_old_pair_next": 34207,
++  "color_present_bullets": 34266,
++  "color_bullet_loop": 34268,
++  "color_bullet_next": 34292,
++  "color_present_shield_old": 34301,
++  "color_present_shield_new": 34316,
++  "color_present_shield": 34328,
++  "color_present_six": 34339,
++  "color_present_six_loop": 34343,
++  "color_present_enemy": 34356,
++  "color_present_ship": 34374,
++  "color_ship_width_ok": 34387,
++  "color_present_box": 34393,
++  "color_box_width_ok": 34417,
++  "color_box_height_ok": 34444,
++  "color_box_row5": 34503,
++  "color_box_row4": 34523,
++  "color_box_row3": 34541,
++  "color_box_row2": 34557,
++  "color_box_row1": 34571,
++  "color_box_next_row": 34583,
++  "color_rect_w": 34595,
++  "color_rect_h": 34596,
++  "color_col": 34597,
++  "color_row": 34598,
++  "wave_unpaint_old": 34599,
++  "wave_unpaint_loop": 34607,
++  "wave_paint_new": 34625,
++  "wave_paint_loop": 34633,
++  "paint_enemy_attr_ix": 34660,
++  "paint_enemy_rows": 34696,
++  "paint_enemy_cols": 34698,
++  "ship_attr_plot": 34712,
++  "ship_paint_cockpit": 34748,
++  "ship_paint_engines": 34782,
++  "player_unpaint_old": 34863,
++  "player_paint_new": 34893,
++  "player_paint_live": 34912,
++  "ship_attr_x": 34942,
++  "ship_attr_y": 34943,
++  "ship_attr_ink": 34944,
++  "player_paint_explosion": 34945,
++  "composite_update": 34962,
++  "composite_restore_old": 34999,
++  "co_re_e": 35007,
++  "co_re_enemy_b": 35025,
++  "co_re_b": 35043,
++  "composite_present_old": 35115,
++  "co_pre_b": 35121,
++  "co_pre_enemy_b": 35139,
++  "composite_present_new": 35155,
++  "co_prn_b": 35164,
++  "co_prn_enemy_b": 35182,
++  "composite_present_enemy_pairs": 35195,
++  "co_union_loop": 35207,
++  "comp_present_enemy_pair": 35222,
++  "co_changed": 35239,
++  "co_union_wide": 35324,
++  "co_union_y": 35331,
++  "co_old_x": 35353,
++  "co_present_fallback": 35354,
++  "co_present_new_only": 35357,
++  "comp_present_ship_union": 35369,
++  "cps_same_x": 35419,
++  "cps_right": 35433,
++  "cps_left": 35447,
++  "cps_y": 35458,
++  "cps_moved_up": 35482,
++  "comp_present_shield_pair": 35497,
++  "cps_fallback": 35555,
++  "comp_restore_enemy_ix": 35605,
++  "comp_present_enemy_ix": 35616,
++  "enemy_box_ix": 35627,
++  "enemy_unchanged": 35666,
++  "enemy_rect_ix": 35687,
++  "comp_restore_bullet_ix": 35706,
++  "comp_present_bullet_ix": 35724,
++  "bullet_rect_dest": 35739,
++  "enemy_palettes": 35773,
++  "old_anim_phase": 35777,
++  "anim_phase": 35778,
++  "draw_anim_phase": 35779,
++  "enemy_paint_color": 35780,
++  "old_enemy_slots": 35781,
++  "old_bullet_slots": 35841,
++  "combat_render": 35847,
++  "player_respawn_tick": 35897,
++  "player_draw": 35937,
++  "player_draw_live": 35960,
++  "player_flame_ready": 36004,
++  "player_draw_death": 36078,
++  "ship_blast_second": 36090,
++  "ship_blast_third": 36099,
++  "ship_blast_ready": 36102,
++  "player_keys": 36130,
++  "player_left_step": 36160,
++  "player_no_left": 36165,
++  "player_right_step": 36189,
++  "player_no_right": 36194,
++  "player_fire": 36198,
++  "player_fire_live": 36218,
++  "player_find_slot": 36248,
++  "player_slot_found": 36263,
++  "player_fire_release": 36287,
++  "wave_update": 36292,
++  "wave_advance_stage": 36328,
++  "wave_stage_store": 36346,
++  "wave_spawn": 36349,
++  "wave_spawn_now": 36352,
++  "wave_spawn_copy": 36371,
++  "wave_spawn_count": 36389,
++  "wave_update_live": 36416,
++  "wave_move_loop": 36436,
++  "wave_move_live": 36461,
++  "wave_speed_ready_v25": 36504,
++  "wave_end_bird": 36542,
++  "wave_rush_reenter": 36549,
++  "wave_rush_hover": 36564,
++  "wave_skip_vertical": 36593,
++  "wave_stage_clock_ready": 36617,
++  "wave_kamikaze_threshold": 36634,
++  "wave_steer_left": 36664,
++  "wave_curve_motion": 36677,
++  "wave_move_next": 36699,
++  "wave_check_live": 36722,
++  "wave_rush_regroup": 36734,
++  "wave_rush_scan": 36752,
++  "wave_rush_scan_next": 36771,
++  "wave_rush_check_clock": 36801,
++  "wave_rush_release_loop": 36818,
++  "wave_rush_release_next": 36830,
++  "rush_rest_irq_tick": 36838,
++  "rush_rest_ticks": 36848,
++  "rush_pause_active": 36849,
++  "rush_hover_found": 36850,
++  "led_anim_clock": 36851,
++  "led_anim_phase": 36852,
++  "hunter_wave_update": 36853,
++  "hunter_drift_store": 36886,
++  "hunter_check_pair_launch": 36889,
++  "hunter_try_launch_v25": 36903,
++  "hunter_after_launch_v25": 36913,
++  "hunter_w_loop": 36925,
++  "hunter_w_store_y": 36962,
++  "hunter_w_sway": 36965,
++  "hunter_w_explosion": 36996,
++  "hunter_w_dive": 37013,
++  "hunter_w_target_left": 37043,
++  "hunter_w_target_ready": 37046,
++  "hunter_w_approach_right": 37064,
++  "hunter_w_turnback": 37071,
++  "hunter_w_return": 37078,
++  "hunter_return_home_y_ok": 37092,
++  "hunter_w_return_y": 37110,
++  "hunter_w_rejoin": 37116,
++  "hunter_w_next": 37126,
++  "hunter_pair_launch": 37162,
++  "hunter_single_launch": 37194,
++  "hunter_single_find": 37204,
++  "hunter_single_ready": 37221,
++  "hunter_single_min_ok": 37237,
++  "hunter_single_max_ok": 37244,
++  "hunter_pair_try_row": 37257,
++  "hunter_pair_lower": 37272,
++  "hunter_pair_ready": 37278,
++  "hunter_target_min_ok": 37308,
++  "hunter_target_max_ok": 37315,
++  "hunter_left_slot_ready": 37347,
++  "hunter_pair_fire": 37365,
++  "hunter_fire_left_ready": 37401,
++  "hunter_single_fire": 37412,
++  "hunter_single_fire_slot": 37427,
++  "hunter_single_fire_ready": 37431,
++  "hunter_fire_one": 37434,
++  "hunter_fire_find": 37446,
++  "hunter_fire_spawn": 37461,
++  "hunter_pair_completion": 37488,
++  "hunter_left_check": 37513,
++  "hunter_single_completion": 37546,
++  "hunter_single_complete_slot": 37561,
++  "hunter_single_completion_check": 37565,
++  "crow_wave_update": 37584,
++  "crow_select_scout": 37602,
++  "crow_scout_selected": 37620,
++  "crow_wave_movement": 37624,
++  "crow_wave_loop": 37632,
++  "crow_move_across": 37680,
++  "crow_scout_dive": 37706,
++  "crow_scout_left": 37743,
++  "crow_scout_turn": 37756,
++  "crow_scout_return": 37763,
++  "crow_scout_home": 37786,
++  "crow_scout_joins": 37789,
++  "crow_explosion_tick": 37799,
++  "crow_wave_next": 37813,
++  "wave_draw": 37836,
++  "wave_draw_loop": 37850,
++  "enemy_draw_ix": 37863,
++  "enemy_kind_raptor": 37906,
++  "enemy_kind_falcon": 37922,
++  "enemy_kind_crow": 37938,
++  "crow_sprite_ready": 37950,
++  "enemy_draw_explosion": 37982,
++  "enemy_kind_ready": 38004,
++  "bullet_update": 38033,
++  "bullet_update_loop": 38039,
++  "bullet_continue": 38062,
++  "bullet_check_enemy": 38083,
++  "bullet_no_hit": 38141,
++  "bullet_check_done": 38154,
++  "bullet_check_boss": 38158,
++  "boss_bullet_hit_score": 38211,
++  "bullet_next": 38220,
++  "bullet_draw_all": 38231,
++  "bullet_draw_loop": 38237,
++  "bullet_draw_ix": 38250,
++  "bullet_draw_with": 38253,
++  "digit_bitmaps": 38280,
++  "wave_initial": 38350,
++  "wave_hunters": 38410,
++  "wave_rush": 38470,
++  "wave_cycle": 38530,
++  "wave_repeat": 38531,
++  "hunter_pair_active": 38532,
++  "hunter_drift": 38533,
++  "hunter_pair_turn": 38534,
++  "hunter_pair_left_index": 38535,
++  "hunter_attack_cooldown": 38536,
++  "hunter_sway_bias": 38537,
++  "hunter_target_left": 38538,
++  "hunter_target_right": 38539,
++  "hunter_slot_index": 38540,
++  "ship_old_x": 38541,
++  "ship_old_y": 38542,
++  "ship_new_x": 38543,
++  "ship_new_y": 38544,
++  "ship_x": 38545,
++  "ship_y": 38546,
++  "fire_held": 38547,
++  "player_respawn_pending": 38548,
++  "kills": 38549,
++  "wave_done": 38550,
++  "wave_stage": 38551,
++  "enemy_slots": 38552,
++  "bullet_slots": 38612,
++  "shield_init": 38618,
++  "shield_irq_tick": 38679,
++  "shield_irq_state": 38689,
++  "shield_irq_segment_37": 38725,
++  "shield_irq_segment_done": 38733,
++  "shield_irq_store_sub": 38746,
++  "shield_irq_expiry": 38749,
++  "shield_irq_ready": 38775,
++  "shield_try_activate": 38785,
++  "shield_key_release": 38829,
++  "shield_collisions": 38834,
++  "shield_bird_loop": 38848,
++  "shield_bird_next": 38906,
++  "enemy_bullet_update": 38915,
++  "enemy_bullet_move_loop": 38921,
++  "eb_hitbox": 38965,
++  "enemy_bullet_remove": 39004,
++  "enemy_bullet_next": 39008,
++  "enemy_fire_countdown": 39028,
++  "enemy_fire_due": 39039,
++  "enemy_fire_period": 39057,
++  "enemy_fire_period_ok": 39073,
++  "enemy_fire_period_set": 39074,
++  "enemy_bullet_find": 39083,
++  "enemy_bullet_free": 39097,
++  "enemy_shooter_turn_ok": 39120,
++  "enemy_shooter_offset": 39130,
++  "enemy_shooter_start": 39134,
++  "enemy_bullet_bird": 39141,
++  "enemy_bullet_shooter_next": 39151,
++  "enemy_shooter_no_wrap": 39168,
++  "enemy_shooter_advance": 39173,
++  "enemy_bullet_spawn": 39179,
++  "boss_bullet_spawn": 39206,
++  "boss_bullet_left": 39220,
++  "enemy_bullet_draw_all": 39238,
++  "enemy_bullet_draw_loop": 39244,
++  "enemy_bullet_draw_next": 39251,
++  "ship_hit_collisions": 39260,
++  "ship_hit_bird_loop": 39282,
++  "ship_hit_bird_next": 39346,
++  "player_take_hit": 39355,
++  "shield_color_unpaint": 39389,
++  "shield_color_paint": 39394,
++  "shield_color_apply": 39399,
++  "shield_state": 39467,
++  "shield_key_held": 39468,
++  "shield_previous_state": 39469,
++  "shield_frame_state": 39470,
++  "shield_timer": 39471,
++  "shield_charge_frame": 39473,
++  "shield_meter": 39474,
++  "shield_meter_displayed": 39475,
++  "shield_ready_pending": 39476,
++  "shield_invulnerable": 39477,
++  "player_lives": 39478,
++  "lives_displayed": 39479,
++  "shield_outline_color": 39480,
++  "shot_spawn_turn": 39481,
++  "shot_shooter_index": 39482,
++  "old_enemy_bullets": 39483,
++  "enemy_bullet_slots": 39492,
++  "boss_start": 39501,
++  "boss_row": 39535,
++  "boss_scene_sync": 39592,
++  "boss_scene_screen_row": 39607,
++  "boss_palette_white": 39644,
++  "boss_palette_red": 39649,
++  "boss_palette_apply": 39654,
++  "boss_white_attr_row": 39665,
++  "boss_white_attr_col": 39671,
++  "boss_eye_tick": 39689,
++  "boss_eye_apply": 39713,
++  "boss_update": 39726,
++  "boss_flash_red": 39753,
++  "boss_erase_start": 39757,
++  "boss_cycle_keep": 39800,
++  "boss_phase_count_done": 39814,
++  "boss_planet_install": 39830,
++  "boss_planet_erase": 39844,
++  "boss_planet_blit": 39851,
++  "planet_bitmap_row": 39856,
++  "planet_blank_row": 39897,
++  "planet_blank_byte": 39900,
++  "planet_next_row": 39904,
++  "boss_planet_palette_cyan": 39916,
++  "boss_planet_palette_white": 39921,
++  "boss_planet_palette_apply": 39923,
++  "planet_attr_row": 39934,
++  "planet_attr_col": 39937,
++  "planet_source": 39958,
++  "planet_mode": 39960,
++  "planet_y": 39961,
++  "planet_ink": 39962,
++  "boss_hp": 39963,
++  "boss_death_left": 39964,
++  "boss_ink": 39965,
++  "boss_y": 39966,
++  "boss_src": 39967,
++  "beep_enemy_destroy": 39969,
++  "beep_enemy_blip_cycle": 39971,
++  "beep_enemy_blip_high": 39977,
++  "beep_enemy_blip_low": 39984,
++  "beep_player_death": 39990,
++  "sfx_death_noise_burst": 39995,
++  "sfx_death_noise_next": 39997,
++  "beep_boss_destroy": 40017,
++  "sfx_boss_rumble_outer": 40022,
++  "sfx_boss_rumble_inner": 40024,
++  "sprite_render": 40044,
++  "spr_dest": 40098,
++  "sprite_row2": 40123,
++  "sprite_row2_n": 40154,
++  "sprite_row3": 40157,
++  "sprite_row3_n": 40193,
++  "sprite_row4": 40196,
++  "sprite_row4_n": 40237,
++  "sprite_row5": 40240,
++  "sprite_row5_n": 40286,
++  "spr_data": 40289,
++  "spr_x": 40291,
++  "spr_y": 40292,
++  "spr_cols": 40293,
++  "spr_height": 40294,
++  "compositor_init": 40295,
++  "composite_setup": 40318,
++  "composite_mul": 40336,
++  "composite_skip": 40344,
++  "sprite_fits": 40346,
++  "sprite_fits_no": 40362,
++  "sprite_restore": 40365,
++  "rest_row2": 40396,
++  "rest_row3": 40433,
++  "rest_row4": 40472,
++  "rest_row5": 40513,
++  "sprite_present": 40556,
++  "pres_row2": 40584,
++  "pres_row3": 40621,
++  "pres_row4": 40660,
++  "pres_row5": 40701,
++  "compositor_scrub": 40744,
++  "scrub_row": 40749,
++  "scrub_advance": 40784,
++  "scrub_y": 40798,
++  "scrub_rows_left": 40799,
++  "stars_v13_init": 40800,
++  "stars_v13_erase_old": 40812,
++  "stars_v11_clear_loop": 40832,
++  "stars_v11_sky_bit": 40869,
++  "stars_v13_move": 40870,
++  "stars_v13_move_loop": 40875,
++  "stars_v13_rate_mid": 40900,
++  "stars_v13_rate_slow": 40908,
++  "stars_v13_move_wrap": 40912,
++  "stars_v13_move_store": 40919,
++  "stars_v13_select_bank": 40927,
++  "stars_v13_select_first": 40954,
++  "stars_v13_cache_rebuild": 40973,
++  "stars_v13_cache_loop": 40983,
++  "stars_v13_screen_addr": 41016,
++  "stars_v13_cache_rebuild_half": 41042,
++  "stars_v11_rebuild_loop": 41051,
++  "stars_v13_masks_init": 41088,
++  "stars_v13_mask_init_loop": 41098,
++  "stars_v13_draw_all": 41126,
++  "stars_v11_draw_loop": 41131,
++  "stars_v13_present_all": 41145,
++  "stars_v13_present_old": 41151,
++  "stars_v13_present_new": 41159,
++  "stars_v13_present_initial": 41167,
++  "stars_v13_sync_loop": 41175,
++  "stars_v13_active_stars": 41195,
++  "stars_v13_active_cache": 41197,
++  "stars_v13_active_previous": 41199,
++  "stars_v13_cache": 41201,
++  "stars_v13_previous": 41297,
++  "arcade_screen_clear": 41393,
+   "input_bits": 61456,
+   "kempston_ok": 61457,
+   "kempston_mode": 61458,
+@@ -617,53 +627,54 @@
+   "boss_eye": 61467,
+   "card_len": 40,
+   "tick_frames": 2,
+-  "input_poll": 41565,
+-  "ip_q": 41585,
+-  "ip_space": 41594,
+-  "ip_sinclair": 41603,
+-  "ip_s9": 41615,
+-  "ip_s8": 41621,
+-  "ip_s7": 41627,
+-  "ip_s6": 41633,
+-  "ip_kempston": 41639,
+-  "ip_store": 41651,
+-  "tick_wait": 41656,
+-  "tick_go": 41671,
+-  "grace_irq_tick": 41679,
+-  "v11_boot_clear": 41689,
+-  "fire_period_first": 41708,
+-  "fire_period_later": 41712,
+-  "score_add_kill": 41716,
+-  "sak_counted": 41739,
+-  "sak_reset": 41764,
+-  "sak_store": 41765,
+-  "score_to_digits": 41771,
+-  "sd_div": 41806,
+-  "sd_loop": 41808,
+-  "sd_done": 41816,
+-  "wave_card_start": 41819,
+-  "wave_card_tick": 41848,
+-  "card_draw": 41858,
+-  "wct_loop": 41870,
+-  "wave_card_end": 41905,
+-  "wce_row": 41910,
+-  "wce_col": 41914,
+-  "wave_card_attr": 41942,
+-  "wca_loop": 41947,
+-  "card_attr_present": 41952,
+-  "card_glyph": 41964,
+-  "cg_row": 41968,
+-  "card_glyphs": 41981,
+-  "glyph_o": 41995,
+-  "glyph_l": 42002,
+-  "glyph_e": 42009,
+-  "glyph_a": 42016,
+-  "glyph_d": 42023,
+-  "glyph_sp": 42030,
+-  "pause_check": 42037,
+-  "pc_down": 42051,
+-  "pc_wait_release": 42071,
+-  "pc_wait_press": 42081,
++  "input_poll": 41421,
++  "ip_q": 41441,
++  "ip_space": 41450,
++  "ip_sinclair": 41459,
++  "ip_s9": 41471,
++  "ip_s8": 41477,
++  "ip_s7": 41483,
++  "ip_s6": 41489,
++  "ip_kempston": 41495,
++  "ip_store": 41507,
++  "tick_wait": 41512,
++  "tick_wait_loop": 41516,
++  "tick_go": 41529,
++  "grace_irq_tick": 41539,
++  "v11_boot_clear": 41549,
++  "fire_period_first": 41568,
++  "fire_period_later": 41572,
++  "score_add_kill": 41576,
++  "sak_counted": 41599,
++  "sak_reset": 41627,
++  "sak_store": 41628,
++  "score_to_digits": 41634,
++  "sd_div": 41669,
++  "sd_loop": 41671,
++  "sd_done": 41679,
++  "wave_card_start": 41682,
++  "wave_card_tick": 41714,
++  "card_draw": 41724,
++  "wct_loop": 41736,
++  "wave_card_end": 41771,
++  "wce_row": 41776,
++  "wce_col": 41780,
++  "wave_card_attr": 41808,
++  "wca_loop": 41813,
++  "card_attr_present": 41818,
++  "card_glyph": 41830,
++  "cg_row": 41834,
++  "card_glyphs": 41847,
++  "glyph_o": 41861,
++  "glyph_l": 41868,
++  "glyph_e": 41875,
++  "glyph_a": 41882,
++  "glyph_d": 41889,
++  "glyph_sp": 41896,
++  "pause_check": 41903,
++  "pc_down": 41917,
++  "pc_wait_release": 41937,
++  "pc_wait_press": 41947,
+   "hud_buf": 61488,
+   "hp_addr": 61504,
+   "hp_stride": 61506,
+@@ -678,6 +689,11 @@
+   "bg_lines": 61616,
+   "bg_k": 61617,
+   "bg_lv": 61618,
++  "snd_idle": 61620,
++  "snd_budget": 61622,
++  "snd_mid_ok": 61624,
++  "badge_pos": 61625,
++  "badge_timer": 61626,
+   "boss_blocks": 61600,
+   "boss_bidx": 61601,
+   "mouth_ticks": 61602,
+@@ -690,44 +706,44 @@
+   "moon_clock": 61609,
+   "blk_col": 61610,
+   "moon_y": 113,
+-  "hud_put": 42104,
+-  "hud_put_row": 42115,
+-  "hud_draw_all": 42144,
+-  "score_draw": 42167,
+-  "score_big_loop": 42198,
+-  "record_draw": 42242,
+-  "record_pair_loop": 42250,
+-  "nibble_pair": 42283,
+-  "nibble_left": 42292,
+-  "nibble_right": 42312,
+-  "nibble_addr": 42320,
+-  "shield_bar_present": 42333,
+-  "shield_bar_redraw": 42352,
+-  "shield_bar_col": 42378,
+-  "shield_text": 42428,
+-  "shield_text_col": 42440,
+-  "shield_text_attr": 42464,
+-  "hud_attr_sync": 42477,
+-  "has_row": 42485,
+-  "shield_colors_ready": 42501,
+-  "shield_colors_active": 42507,
+-  "shield_colors_charge": 42513,
+-  "record_digits": 42519,
+-  "digits6_draw": 42555,
+-  "digits_n_draw": 42560,
+-  "digits6_loop": 42563,
++  "hud_put": 41970,
++  "hud_put_row": 41981,
++  "hud_draw_all": 42010,
++  "score_draw": 42033,
++  "score_big_loop": 42064,
++  "record_draw": 42108,
++  "record_pair_loop": 42116,
++  "nibble_pair": 42149,
++  "nibble_left": 42158,
++  "nibble_right": 42178,
++  "nibble_addr": 42186,
++  "shield_bar_present": 42199,
++  "shield_bar_redraw": 42218,
++  "shield_bar_col": 42244,
++  "shield_text": 42294,
++  "shield_text_col": 42306,
++  "shield_text_attr": 42330,
++  "hud_attr_sync": 42343,
++  "has_row": 42351,
++  "shield_colors_ready": 42367,
++  "shield_colors_active": 42373,
++  "shield_colors_charge": 42379,
++  "record_digits": 42385,
++  "digits6_draw": 42421,
++  "digits_n_draw": 42426,
++  "digits6_loop": 42429,
+   "new_record": 61518,
+   "record_start": 61538,
+-  "score_digits6": 42600,
+-  "lives_hud_present": 42622,
+-  "lives_face_loop": 42639,
+-  "lives_face_ready": 42668,
+-  "explosion_shift_init": 42742,
+-  "esi_frame": 42750,
+-  "esi_phase0": 42753,
+-  "esi_phase": 42768,
+-  "esi_prev": 42777,
+-  "esi_row": 42780,
++  "score_digits6": 42466,
++  "lives_hud_present": 42488,
++  "lives_face_loop": 42505,
++  "lives_face_ready": 42534,
++  "explosion_shift_init": 42608,
++  "esi_frame": 42616,
++  "esi_phase0": 42619,
++  "esi_phase": 42634,
++  "esi_prev": 42643,
++  "esi_row": 42646,
+   "snd_ear": 61520,
+   "snd_seg": 61521,
+   "snd_hp": 61523,
+@@ -741,89 +757,95 @@
+   "mus_note": 61533,
+   "mus_loop": 61534,
+   "snd_play_mode": 61536,
+-  "sfx_start": 42807,
+-  "sfx_take": 42820,
+-  "sfx_load": 42825,
+-  "sfx_end": 42857,
+-  "snd_tick": 42865,
+-  "snd_sweep": 42881,
+-  "snd_sweep_add": 42892,
+-  "snd_slice": 42900,
+-  "tone_until_irq": 42921,
+-  "tone_half": 42928,
+-  "tone_noise_ok": 42942,
+-  "tone_square": 42949,
+-  "tone_out": 42954,
+-  "tone_delay": 42961,
+-  "snd_rest": 42973,
+-  "music_start": 42980,
+-  "music_stop": 42992,
+-  "music_frame": 43003,
+-  "music_note": 43033,
+-  "music_play": 43045,
+-  "music_end": 43074,
+-  "music_rest": 43077,
+-  "sfx_shot": 43083,
+-  "sfx_enemy_fire": 43089,
+-  "sfx_boss_fire": 43095,
+-  "sfx_explode": 43101,
+-  "sfx_boss_hit": 43107,
+-  "sfx_shield_on": 43124,
+-  "sfx_shield_ready": 43130,
+-  "sfx_life": 43136,
+-  "sfx_card": 43142,
+-  "sfx_siren": 43148,
+-  "fx_shot": 43154,
+-  "fx_enemy_fire": 43162,
+-  "fx_boss_fire": 43170,
+-  "fx_explode": 43178,
+-  "fx_boss_hit": 43186,
+-  "fx_boss_hit_low": 43194,
+-  "fx_shield_on": 43202,
+-  "fx_shield_ready": 43215,
+-  "fx_life": 43233,
+-  "fx_card": 43256,
+-  "fx_siren": 43284,
+-  "scanline_table": 43317,
+-  "bitmask_table": 43701,
+-  "player_phase_ptrs": 43709,
+-  "enemy_needle_phase_ptrs": 43725,
+-  "enemy_needle_phase_ptrs_f1": 43741,
+-  "enemy_blade_phase_ptrs": 43757,
+-  "enemy_blade_phase_ptrs_f1": 43773,
+-  "enemy_drone_phase_ptrs": 43789,
+-  "enemy_drone_phase_ptrs_f1": 43805,
+-  "shot_phase_ptrs": 43821,
+-  "explosion_phase_ptrs": 43837,
+-  "wave_sinus": 43853,
+-  "crow_phase_ptrs": 43917,
+-  "crow_phase_ptrs_f1": 43933,
+-  "ship_blast_phase_ptrs_f0": 43949,
+-  "ship_blast_phase_ptrs_f1": 43965,
+-  "ship_blast_phase_ptrs_f2": 43981,
+-  "shield_phase_ptrs": 43997,
+-  "title_lz": 44013,
+-  "phase_lz": 46697,
+-  "hud_lz": 47661,
+-  "hud_big_digits": 48397,
+-  "hud_nibble_digits": 48477,
+-  "hud_s5_digits": 48527,
+-  "hud_face_feliz": 48577,
+-  "hud_face_apurado": 48603,
+-  "hud_face_vacia": 48629,
+-  "hud_shield_rows": 48655,
+-  "hud_txt_listo": 48709,
+-  "hud_txt_activo": 48739,
+-  "hud_txt_carga": 48769,
++  "sfx_start": 42673,
++  "sfx_take": 42686,
++  "sfx_load": 42691,
++  "sfx_end": 42723,
++  "snd_tick": 42731,
++  "snd_sweep": 42747,
++  "snd_sweep_add": 42758,
++  "snd_slice": 42766,
++  "tone_until_irq": 42787,
++  "tone_half": 42794,
++  "snd_half": 42818,
++  "tone_noise_ok": 42832,
++  "tone_square": 42839,
++  "tone_out": 42844,
++  "tone_delay": 42851,
++  "snd_rest": 42857,
++  "snd_rest_loop": 42858,
++  "snd_rest_end": 42875,
++  "snd_mid": 42877,
++  "snd_mid_loop": 42920,
++  "snd_mid_end": 42939,
++  "music_start": 42942,
++  "music_stop": 42954,
++  "music_frame": 42965,
++  "music_note": 42995,
++  "music_play": 43007,
++  "music_end": 43036,
++  "music_rest": 43039,
++  "sfx_shot": 43046,
++  "sfx_enemy_fire": 43052,
++  "sfx_boss_fire": 43058,
++  "sfx_explode": 43064,
++  "sfx_boss_hit": 43070,
++  "sfx_shield_on": 43087,
++  "sfx_shield_ready": 43093,
++  "sfx_life": 43099,
++  "sfx_card": 43105,
++  "sfx_siren": 43111,
++  "fx_shot": 43117,
++  "fx_enemy_fire": 43130,
++  "fx_boss_fire": 43138,
++  "fx_explode": 43151,
++  "fx_boss_hit": 43164,
++  "fx_boss_hit_low": 43177,
++  "fx_shield_on": 43190,
++  "fx_shield_ready": 43203,
++  "fx_life": 43221,
++  "fx_card": 43244,
++  "fx_siren": 43272,
++  "scanline_table": 43305,
++  "bitmask_table": 43689,
++  "player_phase_ptrs": 43697,
++  "enemy_needle_phase_ptrs": 43713,
++  "enemy_needle_phase_ptrs_f1": 43729,
++  "enemy_blade_phase_ptrs": 43745,
++  "enemy_blade_phase_ptrs_f1": 43761,
++  "enemy_drone_phase_ptrs": 43777,
++  "enemy_drone_phase_ptrs_f1": 43793,
++  "shot_phase_ptrs": 43809,
++  "explosion_phase_ptrs": 43825,
++  "wave_sinus": 43841,
++  "crow_phase_ptrs": 43905,
++  "crow_phase_ptrs_f1": 43921,
++  "ship_blast_phase_ptrs_f0": 43937,
++  "ship_blast_phase_ptrs_f1": 43953,
++  "ship_blast_phase_ptrs_f2": 43969,
++  "shield_phase_ptrs": 43985,
++  "title_lz": 44001,
++  "phase_lz": 46685,
++  "hud_lz": 47649,
++  "hud_big_digits": 48385,
++  "hud_nibble_digits": 48465,
++  "hud_s5_digits": 48515,
++  "hud_face_feliz": 48565,
++  "hud_face_apurado": 48591,
++  "hud_face_vacia": 48617,
++  "hud_shield_rows": 48643,
++  "hud_txt_listo": 48697,
++  "hud_txt_activo": 48727,
++  "hud_txt_carga": 48757,
+   "frame_bitmap_low": 29888,
+-  "enemy_shot_phase_ptrs": 48799,
+-  "flame_phase_ptrs_f0": 48815,
+-  "flame_phase_ptrs_f1": 48831,
++  "enemy_shot_phase_ptrs": 48787,
++  "flame_phase_ptrs_f0": 48803,
++  "flame_phase_ptrs_f1": 48819,
+   "explosion_src": 30336,
+-  "explosion_phase_ptrs_f0": 48847,
+-  "explosion_phase_ptrs_f1": 48863,
+-  "explosion_phase_ptrs_f2": 48879,
+-  "title_star_cells": 48895,
++  "explosion_phase_ptrs_f0": 48835,
++  "explosion_phase_ptrs_f1": 48851,
++  "explosion_phase_ptrs_f2": 48867,
++  "title_star_cells": 48883,
+   "title_star_count": 36,
+-  "frame_attr_data": 48967
++  "frame_attr_data": 48955
+ }
+\ No newline at end of file
+diff -ruN -x __pycache__ -x '*.tap' -x '*.png' -x '*.bin' -x '*.scr' -x '*.gif' -x 'CAMBIOS_V1_3*.patch' HALCONES_ESTELARES_CODIGO_FUENTE_1_3/src/gameplay.asm hal/src/gameplay.asm
+--- HALCONES_ESTELARES_CODIGO_FUENTE_1_3/src/gameplay.asm	2026-11-12 02:35:19.491123167 +0100
++++ hal/src/gameplay.asm	2026-11-12 03:20:19.507687750 +0100
+@@ -143,6 +143,7 @@
+  ret z
+  xor a
+  ld (shield_ready_pending),a
++ call badge_shine           ; V1.3: la insignia brilla
+  call sfx_shield_ready
+  ret
+ 
+@@ -1631,97 +1632,7 @@
+  ld (rush_rest_ticks),a
+  ret
+ 
+-; Three left-rail signal LEDs, sequence top→middle→bottom→middle→top.
+-; Their original bitmap remains immutable: only native 8x8 INK attributes
+-; and private color shadow are changed. No sprite/compositor memory writes.
+-led_frame_tick:
+- ; V1.2: los LEDs del marco informan. MOAI: los tres fijos en rojo. Enemigo
+- ; bajando cerca de la nave: los tres parpadean rapido. Si no, el barrido de
+- ; siempre: verde con el escudo listo, rojo mientras no lo esta.
+- ld a,(wave_stage)
+- cp 3
+- ld a,0x42
+- jr z,led_all
+- call led_danger
+- jr z,led_sweep
+- ld a,(frame_index)
+- and 2
+- ld a,0x42
+- jr nz,led_all
+- ld a,0x02
+-led_all:
+- ld b,a
+- jr led_write
+-led_sweep:
+- ld a,(led_anim_clock)
+- inc a
+- cp 8
+- jp c,led_frame_clock_store
+- xor a
+- ld (led_anim_clock),a
+- ld a,(led_anim_phase)
+- inc a
+- and 3
+- ld (led_anim_phase),a
+- jp led_frame_apply
+-led_frame_clock_store:
+- ld (led_anim_clock),a
+-led_frame_apply:
+- ld bc,0x0242               ; B = apagado, C = encendido (rojo)
+- ld a,(shield_state)
+- or a
+- jr nz,led_colors_ok
+- ld bc,0x0444               ; escudo listo: verde
+-led_colors_ok:
+- call led_write             ; los tres apagados...
+- ld a,(led_anim_phase)      ; ...y se enciende el que toca (0 arriba, 1/3 centro, 2 abajo)
+- ld hl,0x58c0
+- or a
+- jr z,led_one
+- ld hl,0x5a40
+- cp 2
+- jr z,led_one
+- ld hl,0x5980
+-led_one:
+- ld (hl),c
+- ld a,h
+- add a,0x99                 ; $58xx -> $F1xx (sombra privada)
+- ld h,a
+- ld (hl),c
+- ret
+-led_write:                  ; B = atributo para las tres lamparas
+- ld a,b
+- ld (0x58c0),a
+- ld (0x5980),a
+- ld (0x5a40),a
+- ld (0xf1c0),a
+- ld (0xf280),a
+- ld (0xf340),a
+- ret
+-; NZ si algun enemigo vivo (no en explosion ni reagrupado) esta en y>=112.
+-led_danger:
+- ld hl,enemy_slots+1
+- ld a,(enemy_count)       ; V1.2: 10 con los cuervos, 6 en el resto
+- ld b,a
+-led_danger_loop:
+- ld a,(hl)
+- cp 112
+- jr c,led_danger_next
+- inc hl
+- ld a,(hl)
+- dec hl
+- or a
+- jr z,led_danger_next
+- cp 3
+- jr z,led_danger_next
+- cp 5
+- ret nz
+-led_danger_next:
+- ld de,6
+- add hl,de
+- djnz led_danger_loop
+- xor a
+- ret
++; V1.3: las rutinas de los LEDs (led_*) estan ahora en src/v12_bajo.asm.
+ rush_rest_ticks: db 0
+ rush_pause_active: db 0
+ rush_hover_found: db 0
+diff -ruN -x __pycache__ -x '*.tap' -x '*.png' -x '*.bin' -x '*.scr' -x '*.gif' -x 'CAMBIOS_V1_3*.patch' HALCONES_ESTELARES_CODIGO_FUENTE_1_3/src/irq_im2_v15.asm hal/src/irq_im2_v15.asm
+--- HALCONES_ESTELARES_CODIGO_FUENTE_1_3/src/irq_im2_v15.asm	2026-11-12 01:46:39.201210693 +0100
++++ hal/src/irq_im2_v15.asm	2026-11-12 03:10:59.864969358 +0100
+@@ -45,6 +45,7 @@
+  call rush_rest_irq_tick   ; V2.6: 100 physical IRQ ticks per kamikaze regroup.
+  call gameover_irq_tick  ; Three-second GAME OVER input lockout (150 real IRQs).
+  call grace_irq_tick     ; V1.1: invulnerabilidad extra al reaparecer.
++ call snd_mid            ; V1.3: trozo de sonido a mitad de tick (< 1 fotograma).
+ irq_paused:
+  pop hl                  ; Restore HL exactly as interrupted.
+  pop af                  ; Restore A and original flags exactly.
+diff -ruN -x __pycache__ -x '*.tap' -x '*.png' -x '*.bin' -x '*.scr' -x '*.gif' -x 'CAMBIOS_V1_3*.patch' HALCONES_ESTELARES_CODIGO_FUENTE_1_3/src/v11_controles.asm hal/src/v11_controles.asm
+--- HALCONES_ESTELARES_CODIGO_FUENTE_1_3/src/v11_controles.asm	2026-11-12 02:12:13.390241453 +0100
++++ hal/src/v11_controles.asm	2026-11-12 03:20:19.506932477 +0100
+@@ -85,18 +85,22 @@
+ ; Espera a que pasen tick_frames interrupciones desde el ultimo tick: el juego
+ ; avanza siempre a 25 ticks/s, ni mas rapido en escenas ligeras ni a saltos.
+ tick_wait:
+- di
++ xor a                      ; V1.3: el juego ya acabo su trabajo: aqui no
++ ld (snd_mid_ok),a          ; hace falta el trozo de mitad de tick.
++; V1.3: sin DI. Con HALT hacia falta para no dormirse si la IRQ llegaba entre
++; la comprobacion y el HALT; ahora la espera compara tick_irqs con E sin parar
++; (si cambia, vuelve enseguida) y una IRQ nunca se pierde.
++tick_wait_loop:
+  ld a,(tick_irqs)
+  cp tick_frames
+  jr nc,tick_go
+  ld e,a
+- ei
+  call snd_slice              ; V1.2: el efecto suena en el tiempo que sobra.
+- jr tick_wait
++ jr tick_wait_loop
+ tick_go:
+  xor a
+  ld (tick_irqs),a
+- ei
++ call snd_budget_set        ; V1.3: sonido a mitad del tick que empieza.
+  jp snd_tick                 ; V1.2: barrido y segmentos del efecto, 1 vez por tick.
+ 
+ ; IM2 (guarda AF y HL el llamador).
+@@ -155,6 +159,7 @@
+  jr nc,sak_reset
+  inc a
+  ld (player_lives),a        ; lives_hud_present dibuja la sonrisa nueva.
++ call badge_shine           ; V1.3: la insignia brilla
+  call sfx_life                ; V1.2: arpegio de vida extra
+ sak_reset:
+  xor a
+@@ -205,6 +210,7 @@
+  inc a
+  ld (card_wave),a
+  call hud_phase_draw         ; V1.2: casillas de oleada y numero en el marcador.
++ call badge_shine           ; V1.3: la insignia brilla
+  call sfx_card
+  ld a,0x46
+  jp wave_card_attr
+diff -ruN -x __pycache__ -x '*.tap' -x '*.png' -x '*.bin' -x '*.scr' -x '*.gif' -x 'CAMBIOS_V1_3*.patch' HALCONES_ESTELARES_CODIGO_FUENTE_1_3/src/v12_bajo.asm hal/src/v12_bajo.asm
+--- HALCONES_ESTELARES_CODIGO_FUENTE_1_3/src/v12_bajo.asm	2026-11-12 02:24:03.693554263 +0100
++++ hal/src/v12_bajo.asm	2026-11-12 03:20:19.506460104 +0100
+@@ -605,3 +605,207 @@
+  pop de
+  ld a,(hl)
+  ret
++
++; V1.3 (sonido, desde tick_go; aqui en memoria baja: no es critico en tiempo)
++; Al empezar cada tick: presupuesto = 3/4 del rato libre del tick anterior
++; menos 200, entre 0 y 1400 (10 ms, siempre menos de un fotograma).
++snd_budget_set:
++ ld hl,(snd_idle)
++ ld d,h
++ ld e,l
++ ld b,2
++snd_budget_q:
++ ld a,d                     ; DE = rato libre / 4
++ or a
++ rra
++ ld d,a
++ ld a,e
++ rra
++ ld e,a
++ djnz snd_budget_q
++ or a
++ sbc hl,de                  ; HL = 3/4 del rato libre
++ ld de,200                  ; margen por si el tick siguiente pesa mas
++ sbc hl,de
++ jr nc,snd_budget_pos
++ ld hl,0
++snd_budget_pos:
++ ld de,1400                 ; tope: 36 400 T (10 ms), menos de un fotograma
++ push hl
++ sbc hl,de
++ pop hl
++ jr c,snd_budget_ok
++ ex de,hl
++snd_budget_ok:
++ ld (snd_budget),hl
++ ld hl,0
++ ld (snd_idle),hl
++ ld a,1
++ ld (snd_mid_ok),a
++ ret
++
++
++; V1.3: LEDs del marco (antes en gameplay.asm; aqui hay sitio).
++; Three left-rail signal LEDs, sequence top→middle→bottom→middle→top.
++; Their original bitmap remains immutable: only native 8x8 INK attributes
++; and private color shadow are changed. No sprite/compositor memory writes.
++led_frame_tick:
++ call badge_tick            ; V1.3: brillo de la insignia ESF del marcador.
++ ; V1.2: los LEDs del marco informan. MOAI: los tres fijos en rojo. Enemigo
++ ; bajando cerca de la nave: los tres parpadean rapido. Si no, el barrido de
++ ; siempre: verde con el escudo listo, rojo mientras no lo esta.
++ ld a,(wave_stage)
++ cp 3
++ ld a,0x42
++ jr z,led_all
++ call led_danger
++ jr z,led_sweep
++ ld a,(frame_index)
++ and 2
++ ld a,0x42
++ jr nz,led_all
++ ld a,0x02
++led_all:
++ ld b,a
++ jr led_write
++led_sweep:
++ ld a,(led_anim_clock)
++ inc a
++ cp 8
++ jp c,led_frame_clock_store
++ xor a
++ ld (led_anim_clock),a
++ ld a,(led_anim_phase)
++ inc a
++ and 3
++ ld (led_anim_phase),a
++ jp led_frame_apply
++led_frame_clock_store:
++ ld (led_anim_clock),a
++led_frame_apply:
++ ld bc,0x0242               ; B = apagado, C = encendido (rojo)
++ ld a,(shield_state)
++ or a
++ jr nz,led_colors_ok
++ ld bc,0x0444               ; escudo listo: verde
++led_colors_ok:
++ call led_write             ; los tres apagados...
++ ld a,(led_anim_phase)      ; ...y se enciende el que toca (0 arriba, 1/3 centro, 2 abajo)
++ ld hl,0x58c0
++ or a
++ jr z,led_one
++ ld hl,0x5a40
++ cp 2
++ jr z,led_one
++ ld hl,0x5980
++led_one:
++ ld (hl),c
++ ld a,h
++ add a,0x99                 ; $58xx -> $F1xx (sombra privada)
++ ld h,a
++ ld (hl),c
++ ret
++led_write:                  ; B = atributo para las tres lamparas
++ ld a,b
++ ld (0x58c0),a
++ ld (0x5980),a
++ ld (0x5a40),a
++ ld (0xf1c0),a
++ ld (0xf280),a
++ ld (0xf340),a
++ ret
++; NZ si algun enemigo vivo (no en explosion ni reagrupado) esta en y>=112.
++led_danger:
++ ld hl,enemy_slots+1
++ ld a,(enemy_count)       ; V1.2: 10 con los cuervos, 6 en el resto
++ ld b,a
++led_danger_loop:
++ ld a,(hl)
++ cp 112
++ jr c,led_danger_next
++ inc hl
++ ld a,(hl)
++ dec hl
++ or a
++ jr z,led_danger_next
++ cp 3
++ jr z,led_danger_next
++ cp 5
++ ret nz
++led_danger_next:
++ ld de,6
++ add hl,de
++ djnz led_danger_loop
++ xor a
++ ret
++
++; ---------------------------------------------------------------------------
++; V1.3: BRILLO DE LA INSIGNIA ESF. La insignia (celdas 25..30 x 15..22, tinta
++; blanca brillante) se cruza en diagonal con una franja cian-amarillo-cian, una
++; diagonal por tick (16 ticks, 0,6 s). Solo cambian atributos (pantalla y
++; sombra), nunca pixeles. Brilla sola cada 8 s y al empezar cada oleada, con
++; la vida extra y cuando el escudo vuelve a estar listo (badge_shine).
++badge_shine:
++ ld a,1
++ ld (badge_pos),a
++ xor a
++ ld (badge_timer),a
++ ret
++
++badge_tick:
++ ld a,(badge_pos)
++ or a
++ jr nz,badge_step
++ ld hl,badge_timer
++ inc (hl)
++ ld a,(hl)
++ cp 200                     ; 8 s a 25 ticks/s
++ ret c
++ jr badge_shine
++badge_step:
++ ld hl,0x5800+15*32+25
++ ld d,0                     ; D = fila de la insignia (0..7)
++badge_row:
++ ld e,0                     ; E = columna (0..5)
++badge_col:
++ ld a,d
++ add a,e
++ inc a
++ ld c,a                     ; C = diagonal + 1
++ ld a,(badge_pos)
++ sub c                      ; 0 y 2: cian (bordes), 1: amarillo (centro)
++ ld c,0x45
++ jr z,badge_put
++ dec a
++ ld c,0x46
++ jr z,badge_put
++ dec a
++ ld c,0x45
++ jr z,badge_put
++ ld c,0x47
++badge_put:
++ ld (hl),c
++ ld a,h
++ add a,0x99                 ; $58xx -> $F1xx (sombra privada)
++ ld h,a
++ ld (hl),c
++ sub 0x99
++ ld h,a
++ inc hl
++ inc e
++ ld a,e
++ cp 6
++ jr nz,badge_col
++ ld bc,26
++ add hl,bc
++ inc d
++ ld a,d
++ cp 8
++ jr nz,badge_row
++ ld hl,badge_pos
++ inc (hl)
++ ld a,(hl)
++ cp 17                      ; en 16 ya esta toda blanca otra vez
++ ret c
++ ld (hl),0
++ ret
+diff -ruN -x __pycache__ -x '*.tap' -x '*.png' -x '*.bin' -x '*.scr' -x '*.gif' -x 'CAMBIOS_V1_3*.patch' HALCONES_ESTELARES_CODIGO_FUENTE_1_3/src/v12_hud.asm hal/src/v12_hud.asm
+--- HALCONES_ESTELARES_CODIGO_FUENTE_1_3/src/v12_hud.asm	2026-11-12 02:24:03.706605743 +0100
++++ hal/src/v12_hud.asm	2026-11-12 03:10:59.865127784 +0100
+@@ -15,6 +15,11 @@
+ bg_lines equ 0xf0b0
+ bg_k equ 0xf0b1
+ bg_lv equ 0xf0b2      ; V1.2: enemigos en juego (10 cuervos, 6 el resto)
++snd_idle equ 0xf0b4         ; V1.3: rato libre del tick (unidades de 26 T)
++snd_budget equ 0xf0b6       ; V1.3: trozo de sonido para la mitad del tick
++snd_mid_ok equ 0xf0b8       ; V1.3: 1 = el trozo de mitad de tick aun no ha sonado
++badge_pos equ 0xf0b9        ; V1.3: brillo de la insignia ESF (0 = parado)
++badge_timer equ 0xf0ba      ; V1.3: ticks hasta el siguiente brillo
+ ; V1.2: MOAI y luna (rutinas en src/v12_bajo.asm)
+ boss_blocks equ 0xf0a0      ; bloques del MOAI que quedan por derrumbar (0 = sin empezar)
+ boss_bidx equ 0xf0a1        ; bloque siguiente (0..65), avanza de 37 en 37
+diff -ruN -x __pycache__ -x '*.tap' -x '*.png' -x '*.bin' -x '*.scr' -x '*.gif' -x 'CAMBIOS_V1_3*.patch' HALCONES_ESTELARES_CODIGO_FUENTE_1_3/src/v12_sound.asm hal/src/v12_sound.asm
+--- HALCONES_ESTELARES_CODIGO_FUENTE_1_3/src/v12_sound.asm	2026-11-12 01:46:39.199112557 +0100
++++ hal/src/v12_sound.asm	2026-11-12 03:19:35.750590488 +0100
+@@ -84,6 +84,8 @@
+  ret
+ 
+ ; Toca el efecto en curso hasta que tick_irqs deje de valer E (o espera).
++; V1.3: el rato que se pasa aqui se cuenta en snd_idle (unidades de 26 T) para
++; saber cuanto sobra en cada tick y tocar parte a mitad de tick (snd_mid).
+ snd_slice:
+  ld a,(snd_left)
+  or a
+@@ -100,6 +102,20 @@
+  ld a,(tick_irqs)
+  ld e,a
+ tone_half:
++ call snd_half
++ push hl
++ ld bc,(snd_idle)
++ add hl,bc
++ ld bc,8                    ; lo que cuesta cada media onda ademas del retardo
++ add hl,bc
++ ld (snd_idle),hl
++ pop hl
++ ld a,(tick_irqs)
++ cp e
++ jr z,tone_half
++ ret
++; Media onda: HL = semiperiodo. Conserva HL y DE.
++snd_half:
+  ld a,(snd_play_mode)
+  or a
+  jr z,tone_square
+@@ -124,15 +140,64 @@
+  ld a,b
+  or c
+  jr nz,tone_delay
+- ld a,(tick_irqs)
+- cp e
+- jr z,tone_half
+  ret
++; Sin efecto: espera contando (antes HALT) para medir el rato libre.
+ snd_rest:
++ push hl
++snd_rest_loop:
+  ld a,(tick_irqs)
+  cp e
++ jr nz,snd_rest_end
++ ld hl,(snd_idle)
++ inc hl
++ inc hl
++ inc hl
++ ld (snd_idle),hl
++ jr snd_rest_loop
++snd_rest_end:
++ pop hl
++ ret
++
++; V1.3: desde la interrupcion de mitad de tick (tick_irqs pasa a 1) toca la
++; mitad de lo que sobro en el tick anterior (snd_budget). Asi el efecto suena
++; dos veces por tick y los huecos de silencio son la mitad de largos, sin
++; gastar mas tiempo del que ya sobraba. Conserva todo salvo AF y HL.
++snd_mid:
++ ld a,(snd_mid_ok)
++ or a
++ ret z
++ ld a,(tick_irqs)
++ dec a
+  ret nz
+- halt
++ ld (snd_mid_ok),a          ; una vez por tick
++ ld a,(snd_left)
++ or a
++ ret z
++ ld a,(snd_mode)
++ cp 2
++ ret z
++ ld (snd_play_mode),a
++ push bc
++ push de
++ ld de,(snd_budget)
++ ld hl,(snd_idle)           ; cuenta como rato libre del tick (el final
++ add hl,de                  ; del tick sobrara eso menos)
++ ld (snd_idle),hl
++ ld hl,(snd_hp)
++snd_mid_loop:
++ call snd_half
++ ex de,hl
++ or a
++ sbc hl,de
++ jr c,snd_mid_end
++ ld bc,8
++ sbc hl,bc
++ jr c,snd_mid_end
++ ex de,hl
++ jr snd_mid_loop
++snd_mid_end:
++ pop de
++ pop bc
+  ret
+ 
+ ; MUSICA: tune = pares (nota 1..18, fotogramas); nota 0 = silencio; 255 = fin.
+@@ -198,7 +263,7 @@
+ music_rest:
+  ld a,(tick_irqs)
+  ld e,a
+- jr snd_rest
++ jp snd_rest
+ 
+ ; Llamadas de efecto (sustituyen a los clics de la 1.1).
+ sfx_shot:
+@@ -237,28 +302,40 @@
+  jp sfx_start
+ 
+ ; efectos: prioridad, segmentos (semiperiodo, delta, ticks, modo), fin
++; V1.3: rehechos para el beeper troceado (suena a rafagas, dos por tick): golpe
++; de ruido al principio, que es lo que mejor se oye a trozos, y barridos cortos.
+ fx_shot: db 1
+- dw 34
+- db 26,5,0
++ dw 5
++ db 0,1,1                   ; chasquido
++ dw 28
++ db 22,3,0                  ; piu que cae
+  dw 0
+ fx_enemy_fire: db 1
+- dw 80
+- db 246,3,0
++ dw 90
++ db 242,3,0                 ; trino que sube
+  dw 0
+ fx_boss_fire: db 2
+- dw 230
+- db 20,4,0
++ dw 60
++ db 0,1,1                   ; soplido
++ dw 260
++ db 24,3,0                  ; disparo grave
+  dw 0
+ fx_explode: db 2
+- dw 14
+- db 7,7,1
++ dw 4
++ db 0,2,1                   ; estallido
++ dw 18
++ db 6,6,1                   ; retumbo que se apaga
+  dw 0
+ fx_boss_hit: db 2
+- dw 320
+- db 40,3,0
++ dw 30
++ db 0,1,1                   ; golpe en la piedra
++ dw 340
++ db 40,2,0
+  dw 0
+ fx_boss_hit_low: db 2
+- dw 120
++ dw 12
++ db 0,1,1                   ; la piedra cruje (le queda poco)
++ dw 140
+  db 30,3,0
+  dw 0
+ fx_shield_on: db 3
+diff -ruN -x __pycache__ -x '*.tap' -x '*.png' -x '*.bin' -x '*.scr' -x '*.gif' -x 'CAMBIOS_V1_3*.patch' HALCONES_ESTELARES_CODIGO_FUENTE_1_3/tests/mini_z80.py hal/tests/mini_z80.py
+--- HALCONES_ESTELARES_CODIGO_FUENTE_1_3/tests/mini_z80.py	2026-11-12 01:43:53.850555683 +0100
++++ hal/tests/mini_z80.py	2026-11-12 03:29:10.039280992 +0100
+@@ -80,6 +80,9 @@
+   # V1.1: este interprete no lleva reloj IM2; cada tick de juego recibe aqui
+   # las 2 interrupciones que tick_wait espera (25 ticks/s en el Spectrum).
+   if self.pc==SYM.get('tick_wait',-1):self.m[SYM['tick_irqs']]=2
++  # V1.3: la espera sin efecto ya no es HALT sino un bucle que mira tick_irqs:
++  # aqui hace de la interrupcion que llegaria.
++  if self.pc==SYM.get('snd_rest_loop',-1):self.m[SYM['tick_irqs']]=(self.m[SYM['tick_irqs']]+1)&255
+   at=self.pc;op=self.rd();self.steps+=1
+   if op in (0x00,0x76,0xf3,0xfb):return
+   if op==0xc9:self.pc=self.pop();return
+diff -ruN -x __pycache__ -x '*.tap' -x '*.png' -x '*.bin' -x '*.scr' -x '*.gif' -x 'CAMBIOS_V1_3*.patch' HALCONES_ESTELARES_CODIGO_FUENTE_1_3/tests/test_v13_galaga.py hal/tests/test_v13_galaga.py
+--- HALCONES_ESTELARES_CODIGO_FUENTE_1_3/tests/test_v13_galaga.py	2026-11-12 02:41:00.457284223 +0100
++++ hal/tests/test_v13_galaga.py	2026-11-12 03:21:10.238669107 +0100
+@@ -6,7 +6,11 @@
+ 3. Cada fase pinta su fondo lejano en el cielo (D800), distinto en cada una;
+    durante el MOAI el fondo se borra y vuelve en la fase siguiente.
+ 4. Pantalla y sombra de atributos coinciden al acabar cada tick (sin celdas
+-   rojas olvidadas al moverse los cuervos)."""
++   rojas olvidadas al moverse los cuervos).
++5. Sonido: el efecto suena tambien a mitad de tick (interrupcion intermedia),
++   no solo al final, y el juego sigue a 25 ticks/s.
++6. La insignia ESF brilla (franja diagonal de color) al empezar la oleada y
++   vuelve a quedar blanca; pantalla y sombra iguales."""
+ import sys,json
+ from pathlib import Path
+ R=Path(__file__).resolve().parents[1]
+@@ -106,7 +110,52 @@
+     z.step=orig
+     assert ticks>150 and not bad,('atributos sin presentar',bad[:5])
+ 
++def test_sonido_mitad_de_tick():
++    s=in_game();z=s.z;m=z.m
++    for f in range(100):
++        s.frame(())
++        if m[S['card_ticks']]==0:break
++    outs=[];op=s.port_out
++    def po(port,v):
++        if port&1==0:outs.append(z.t)
++        op(port,v)
++    z.port_out=po
++    starts=[];t=S['combat_tick'];irq_t=[]
++    for f in range(120):
++        s.keys={'SPACE'} if f%8<4 else set();end=z.t+harness.FRAME
++        while z.t<end:
++            if z.pc==t:starts.append(z.t)
++            z.step()
++        s.frames+=1
++        if z.iff1 and not z.ei_delay:
++            pc0,sp0=((z.pc+1)&0xffff if z.halted else z.pc),z.sp
++            irq_t.append(z.t)
++            if z.interrupt():
++                while not(z.pc==pc0 and z.sp==sp0):z.step()
++    import bisect
++    mid=0
++    for a in irq_t:
++        i=bisect.bisect_left(starts,a)
++        if 0<i<len(starts) and a-starts[i-1]<harness.FRAME+5000:
++            k=bisect.bisect_left(outs,a)
++            if k<len(outs) and outs[k]-a<3000:mid+=1
++    assert mid>=10,('sin sonido a mitad de tick',mid)
++    assert len(starts)>=55,len(starts)
++
++def test_brillo_insignia():
++    s=in_game();m=s.z.m
++    assert m[S['badge_pos']]==1,'brilla al empezar la oleada'
++    seen=set()
++    for f in range(40):
++        s.frame(())
++        for r in range(15,23):
++            for c in range(25,31):seen.add(m[0x5800+r*32+c])
++    assert {0x45,0x46,0x47}<=seen,seen
++    assert m[S['badge_pos']]==0
++    assert all(m[0x5800+r*32+c]==0x47 and m[0xf100+r*32+c]==0x47 for r in range(15,23) for c in range(25,31))
++    s.screen(str(R/'build'/'V13_INSIGNIA.png'))
++
+ if __name__=='__main__':
+-    for t in (test_disparo,test_formacion_y_fondos,test_atributos_coherentes):
++    for t in (test_disparo,test_formacion_y_fondos,test_atributos_coherentes,test_sonido_mitad_de_tick,test_brillo_insignia):
+         t();print('PASS',t.__name__,flush=True)
+-    print('PASS V1.3: 2 balas a 12 px, 10 cuervos / 6 enemigos, fondo por fase, atributos coherentes')
++    print('PASS V1.3: 2 balas a 12 px, 10 cuervos / 6 enemigos, fondo por fase, atributos coherentes, sonido a mitad de tick, brillo de la insignia')
+diff -ruN -x __pycache__ -x '*.tap' -x '*.png' -x '*.bin' -x '*.scr' -x '*.gif' -x 'CAMBIOS_V1_3*.patch' HALCONES_ESTELARES_CODIGO_FUENTE_1_3/tests/test_v18_arcade.py hal/tests/test_v18_arcade.py
+--- HALCONES_ESTELARES_CODIGO_FUENTE_1_3/tests/test_v18_arcade.py	2026-11-12 02:34:11.611320183 +0100
++++ hal/tests/test_v18_arcade.py	2026-11-12 03:29:30.534793156 +0100
+@@ -17,7 +17,7 @@
+     """Inject one IM2 IRQ and execute its real Z80 handler to RETI."""
+     pc=v.pc;sp=v.sp;regs=tuple(v.r);f=v.f;ix=v.ix;iy=v.iy
+     v.push(pc);v.pc=0xfdfd
+-    v.run_to(lambda q:q.pc==pc and q.sp==sp,steps=500)
++    v.run_to(lambda q:q.pc==pc and q.sp==sp,steps=100000)  # V1.3: puede tocar el trozo de sonido de mitad de tick
+     assert tuple(v.r)==regs and v.f==f and v.ix==ix and v.iy==iy,'ISR clobbered registers'
+ 
+ assert v.val('ship_y')==152

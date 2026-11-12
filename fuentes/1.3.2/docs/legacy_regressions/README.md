@@ -1,0 +1,1 @@
+Legacy checks for V0.4, V0.5, and monochrome V0.8. They assert intentionally replaced art and old shadow renderers. Kept for historic reference, not applicable to V0.9. Run tests/test_arcade_v09.py and tests/test_hud_real.py for current revision.

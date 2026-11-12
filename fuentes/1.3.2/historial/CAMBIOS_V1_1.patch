@@ -1,0 +1,2797 @@
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' FINAL_1_0_1/build.py hal/build.py
+--- FINAL_1_0_1/build.py	2026-11-11 22:37:15.899770309 +0100
++++ V1_1/build.py	2026-11-11 23:56:45.424951958 +0100
+@@ -14,12 +14,30 @@
+ from tools.z80_assembler import A
+ from tools.tap_writer import create_tap
+ from tools import relocate_sprite_assets_v22
+-source='\n'.join((R/p).read_text() for p in ['src/main.asm','src/irq_im2_v15.asm','src/title_screen.asm','src/gameover_v20.asm','src/phase_interlude_v24.asm','src/gameplay.asm','src/arcade_rules_v18.asm','src/boss_moai_v19.asm','src/sound_v19.asm','src/arcade_compositor.asm','src/stars_scroll_v13.asm','src/arcade_fast.asm','build/assets.asm','build/combat_assets_v22.asm','build/title_data.asm','build/frame_data_v17.asm','build/shield_assets_v23.asm','build/phase_rle_v24.asm'])
++source='\n'.join((R/p).read_text() for p in ['src/main.asm','src/irq_im2_v15.asm','src/title_screen.asm','src/gameover_v20.asm','src/phase_interlude_v24.asm','src/gameplay.asm','src/arcade_rules_v18.asm','src/boss_moai_v19.asm','src/sound_v19.asm','src/arcade_compositor.asm','src/stars_scroll_v13.asm','src/arcade_fast.asm','src/v11_controles.asm','build/assets.asm','build/combat_assets_v22.asm','build/title_data.asm','build/frame_data_v17.asm','build/shield_assets_v23.asm','build/phase_rle_v24.asm'])
++# V1.1: rutinas frias en memoria baja, a continuacion de los sprites reubicados.
++# Dos ensamblados enlazados por direcciones absolutas (solo JP/CALL entre ellos).
++import re as _re
++low_src=(R/'src/v11_bajo.asm').read_text()
++low_bin_sprites=(R/'build/sprites_reloc_v22.bin').read_bytes()
++LOW_ORG=0x6000+len(low_bin_sprites)
++low_names=[m[1] for m in _re.finditer(r'^([a-z_0-9]+):',low_src,_re.M)]
++def _equs(d,skip=()):return '\n'.join(f'{k} equ {v}' for k,v in d.items() if k not in skip)+'\n'
++a0=A(_equs({k:LOW_ORG for k in low_names})+source);a0.run()
++main_labels={k:v for k,v in a0.labels.items() if k not in low_names}
++lo=A(f' org {LOW_ORG}\n'+_equs(main_labels,set(low_names))+low_src);low_code=lo.run()
++low_labels={k:lo.labels[k] for k in low_names}
++source=_equs(low_labels)+source
+ (R/'build/starter.asm').write_text(source)
+ a=A(source);code=a.run()
++assert {k:v for k,v in a.labels.items() if k not in low_names}==main_labels,'enlace inestable'
+ assert 0x8000+len(code)<0xC000
++assert LOW_ORG+len(low_code)<=0x8000,('memoria baja llena',hex(LOW_ORG+len(low_code)))
+ (R/'build/starter.bin').write_bytes(code)
++(R/'build/v11_bajo.bin').write_bytes(low_code)
+ (R/'build/starter.sym.json').write_text(json.dumps(a.labels,indent=2))
++print(f'MEMORIA BAJA: {LOW_ORG:04X}..{LOW_ORG+len(low_code)-1:04X} ({len(low_code)} bytes); libres hasta 7FFF: {0x8000-LOW_ORG-len(low_code)}')
++print(f'BLOQUE PRINCIPAL: 8000..{0x8000+len(code)-1:04X}; libres hasta BFFF: {0x4000-len(code)}')
+ tap=R/'build/HALCONES_ESTELARES_V281.tap'
+-create_tap(code,'HALCONES',tap,extra_code=(R/'build/moai_bitmap_v19.bin').read_bytes()+(R/'build/jupiter_bitmap_v20.bin').read_bytes()+(R/'build/gameover_rle_v20.bin').read_bytes(),extra_origin=0xf401,low_code=(R/'build/sprites_reloc_v22.bin').read_bytes(),low_origin=0x6000)
++create_tap(code,'HALCONES',tap,extra_code=(R/'build/moai_bitmap_v19.bin').read_bytes()+(R/'build/jupiter_bitmap_v20.bin').read_bytes()+(R/'build/gameover_rle_v20.bin').read_bytes(),extra_origin=0xf401,low_code=low_bin_sprites+low_code,low_origin=0x6000)
+ print(f'ASSEMBLED {len(code)} bytes; SHA256={hashlib.sha256(tap.read_bytes()).hexdigest()}')
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' FINAL_1_0_1/src/arcade_compositor.asm hal/src/arcade_compositor.asm
+--- FINAL_1_0_1/src/arcade_compositor.asm	2026-11-11 22:37:15.899863551 +0100
++++ V1_1/src/arcade_compositor.asm	2026-11-11 22:46:18.982327698 +0100
+@@ -16,6 +16,9 @@
+ sprite_render:
+  call sprite_fits         ; FINAL 1.0.1: nunca pintar fuera de las 192 lineas
+  ret nc
++ ; V1.1: bucles con el estado en registros (HL origen, DE destino, B filas).
++ ; La linea siguiente se calcula con la aritmetica de la pantalla del
++ ; Spectrum en vez de leer scanline_table en cada fila: la mitad de T-states.
+  ld a,(spr_x)
+  and 7
+  add a,a
+@@ -26,23 +29,14 @@
+  ld e,(hl)
+  inc hl
+  ld d,(hl)
+- ex de,hl
+- ld (spr_ptr),hl
+- ld a,(spr_x)
+- rrca
+- rrca
+- rrca
+- and 31
+- ld (spr_col_byte),a
+- ld a,(spr_y)
+- ld l,a
+- ld h,0
+- add hl,hl
+- ld de,scanline_table
+- add hl,de
+- ld (spr_scan_table_ptr),hl
++ push de                  ; Origen: fase preparada del sprite.
++ call spr_dest            ; DE = byte de destino en la imagen privada C000.
++ ld a,d
++ add a,128
++ ld d,a
++ pop hl
+  ld a,(spr_height)
+- ld (spr_rows_left),a
++ ld b,a
+  ld a,(spr_cols)
+  cp 5
+  jp z,sprite_row5
+@@ -52,160 +46,166 @@
+  jp z,sprite_row3
+  jp sprite_row2
+ 
+-; The row prologue is intentionally repeated for each fixed-width specialization.
+-; Removes the runtime inner byte loop and its DJNZ for *every sprite row*.
+-sprite_row2:
+- ld hl,(spr_scan_table_ptr)
++; DE = direccion de pantalla (base 4000) de (spr_x,spr_y). Destruye AF,HL.
++spr_dest:
++ ld a,(spr_y)
++ ld l,a
++ ld h,0
++ add hl,hl
++ ld de,scanline_table
++ add hl,de
+  ld e,(hl)
+  inc hl
+  ld d,(hl)
+- ld a,d
+- add a,128
+- ld d,a
+- inc hl
+- ld (spr_scan_table_ptr),hl
+- ld a,(spr_col_byte)
++ ld a,(spr_x)
++ rrca
++ rrca
++ rrca
++ and 31
+  add a,e
+  ld e,a
+- ld hl,(spr_ptr)
++ ret
++
++sprite_row2:
+  ld a,(de)
+  or (hl)
+  ld (de),a
+  inc hl
+- inc de
++ inc e
+  ld a,(de)
+  or (hl)
+  ld (de),a
+  inc hl
+- inc de
+- ld (spr_ptr),hl
+- ld a,(spr_rows_left)
+- dec a
+- ld (spr_rows_left),a
+- jp nz,sprite_row2
++ ld a,e
++ sub 1
++ ld e,a
++ inc d
++ ld a,d
++ and 7
++ jp nz,sprite_row2_n
++ ld a,e
++ add a,32
++ ld e,a
++ jp c,sprite_row2_n
++ ld a,d
++ sub 8
++ ld d,a
++sprite_row2_n:
++ djnz sprite_row2
+  ret
+ 
+ sprite_row3:
+- ld hl,(spr_scan_table_ptr)
+- ld e,(hl)
+- inc hl
+- ld d,(hl)
+- ld a,d
+- add a,128
+- ld d,a
+- inc hl
+- ld (spr_scan_table_ptr),hl
+- ld a,(spr_col_byte)
+- add a,e
+- ld e,a
+- ld hl,(spr_ptr)
+  ld a,(de)
+  or (hl)
+  ld (de),a
+  inc hl
+- inc de
++ inc e
+  ld a,(de)
+  or (hl)
+  ld (de),a
+  inc hl
+- inc de
++ inc e
+  ld a,(de)
+  or (hl)
+  ld (de),a
+  inc hl
+- inc de
+- ld (spr_ptr),hl
+- ld a,(spr_rows_left)
+- dec a
+- ld (spr_rows_left),a
+- jp nz,sprite_row3
++ ld a,e
++ sub 2
++ ld e,a
++ inc d
++ ld a,d
++ and 7
++ jp nz,sprite_row3_n
++ ld a,e
++ add a,32
++ ld e,a
++ jp c,sprite_row3_n
++ ld a,d
++ sub 8
++ ld d,a
++sprite_row3_n:
++ djnz sprite_row3
+  ret
+ 
+ sprite_row4:
+- ld hl,(spr_scan_table_ptr)
+- ld e,(hl)
+- inc hl
+- ld d,(hl)
+- ld a,d
+- add a,128
+- ld d,a
+- inc hl
+- ld (spr_scan_table_ptr),hl
+- ld a,(spr_col_byte)
+- add a,e
+- ld e,a
+- ld hl,(spr_ptr)
+  ld a,(de)
+  or (hl)
+  ld (de),a
+  inc hl
+- inc de
++ inc e
+  ld a,(de)
+  or (hl)
+  ld (de),a
+  inc hl
+- inc de
++ inc e
+  ld a,(de)
+  or (hl)
+  ld (de),a
+  inc hl
+- inc de
++ inc e
+  ld a,(de)
+  or (hl)
+  ld (de),a
+  inc hl
+- inc de
+- ld (spr_ptr),hl
+- ld a,(spr_rows_left)
+- dec a
+- ld (spr_rows_left),a
+- jp nz,sprite_row4
++ ld a,e
++ sub 3
++ ld e,a
++ inc d
++ ld a,d
++ and 7
++ jp nz,sprite_row4_n
++ ld a,e
++ add a,32
++ ld e,a
++ jp c,sprite_row4_n
++ ld a,d
++ sub 8
++ ld d,a
++sprite_row4_n:
++ djnz sprite_row4
+  ret
+ 
+-; V2.3: five-byte unrolled OR compositor for 32px shield with horizontal phases.
+ sprite_row5:
+- ld hl,(spr_scan_table_ptr)
+- ld e,(hl)
+- inc hl
+- ld d,(hl)
+- ld a,d
+- add a,128
+- ld d,a
+- inc hl
+- ld (spr_scan_table_ptr),hl
+- ld a,(spr_col_byte)
+- add a,e
+- ld e,a
+- ld hl,(spr_ptr)
+  ld a,(de)
+  or (hl)
+  ld (de),a
+  inc hl
+- inc de
++ inc e
+  ld a,(de)
+  or (hl)
+  ld (de),a
+  inc hl
+- inc de
++ inc e
+  ld a,(de)
+  or (hl)
+  ld (de),a
+  inc hl
+- inc de
++ inc e
+  ld a,(de)
+  or (hl)
+  ld (de),a
+  inc hl
+- inc de
++ inc e
+  ld a,(de)
+  or (hl)
+  ld (de),a
+  inc hl
+- ld (spr_ptr),hl
+- ld a,(spr_rows_left)
+- dec a
+- ld (spr_rows_left),a
+- jp nz,sprite_row5
++ ld a,e
++ sub 4
++ ld e,a
++ inc d
++ ld a,d
++ and 7
++ jp nz,sprite_row5_n
++ ld a,e
++ add a,32
++ ld e,a
++ jp c,sprite_row5_n
++ ld a,d
++ sub 8
++ ld d,a
++sprite_row5_n:
++ djnz sprite_row5
+  ret
+ 
+ spr_data: dw 0
+@@ -231,27 +231,23 @@
+  ldir
+  ret
+ 
+-; Shared setup for restoring or presenting one pixel-byte rectangle. Native
+-; Spectrum scanline layout is handled through precomputed scanline_table.
+-; Sets REST_COL, REST_SCAN, REST_ROWS; spr_x/y,cols,height as parameters.
++; V1.1: restaurar (cielo D800 -> trabajo C000) y presentar (C000 -> pantalla)
++; con LDI y el contador de bytes en BC: LDI deja P/V=0 al agotarlo, asi que
++; no hace falta otro contador. Mismas entradas: spr_x, spr_y, spr_cols, spr_height.
+ composite_setup:
+  call sprite_fits         ; FINAL 1.0.1: si no cabe, no se restaura ni presenta
+  jp nc,composite_skip
+- ld a,(spr_x)
+- rrca
+- rrca
+- rrca
+- and 31
+- ld (rest_col),a
+- ld a,(spr_y)
+- ld l,a
+- ld h,0
+- add hl,hl
+- ld de,scanline_table
+- add hl,de
+- ld (rest_scan),hl
++ call spr_dest            ; DE = destino base 4000
+  ld a,(spr_height)
+- ld (rest_rows),a
++ ld c,a
++ ld a,(spr_cols)
++ ld b,a
++ xor a
++composite_mul:
++ add a,c
++ djnz composite_mul
++ ld c,a                   ; BC = filas * columnas (como mucho 160)
++ ld a,(spr_cols)
+  ret
+ 
+ ; Abandona sprite_restore / sprite_present (ambas empiezan con la llamada).
+@@ -276,14 +272,16 @@
+  pop bc
+  ret
+ 
+-; Background -> work RAM. This operates on OLD sprite rectangles, before
+-; composing any object for the next frame; overlap cannot destroy neighbors.
+-
+-; FAST specialized rows use Z80 LDI (16T) instead of an 8-bit copy loop.
+-; Byte width selected once per rectangle. Caution: BC is clobbered by LDI.
+ sprite_restore:
+  call composite_setup
+- ld a,(spr_cols)
++ ex af,af'
++ ld a,d
++ add a,0x98               ; Origen: cielo inmutable D800..EFFF
++ ld h,a
++ ld l,e
++ add a,-24                ; Destino: imagen de trabajo C000..D7FF
++ ld d,a
++ ex af,af'
+  cp 5
+  jp z,rest_row5
+  cp 4
+@@ -292,120 +290,121 @@
+  jp z,rest_row3
+  jp rest_row2
+ rest_row2:
+- ld hl,(rest_scan)
+- ld e,(hl)
+- inc hl
+- ld d,(hl)
+- inc hl
+- ld (rest_scan),hl
+- ld a,(rest_col)
+- add a,e
++ ldi
++ ldi
++ ret po
++ ld a,e
++ sub 2
+  ld e,a
++ ld l,a
++ inc d
++ inc h
+  ld a,d
+- add a,152
+- ld d,a
+- ex de,hl
+- ld d,h
+- ld e,l
++ and 7
++ jp nz,rest_row2
++ ld a,e
++ add a,32
++ ld e,a
++ ld l,a
++ jp c,rest_row2
+  ld a,d
+- sub 24
++ sub 8
+  ld d,a
++ ld a,h
++ sub 8
++ ld h,a
++ jp rest_row2
++rest_row3:
+  ldi
+  ldi
+- ld a,(rest_rows)
+- dec a
+- ld (rest_rows),a
+- jp nz,rest_row2
+- ret
+-rest_row3:
+- ld hl,(rest_scan)
+- ld e,(hl)
+- inc hl
+- ld d,(hl)
+- inc hl
+- ld (rest_scan),hl
+- ld a,(rest_col)
+- add a,e
++ ldi
++ ret po
++ ld a,e
++ sub 3
+  ld e,a
++ ld l,a
++ inc d
++ inc h
+  ld a,d
+- add a,152
+- ld d,a
+- ex de,hl
+- ld d,h
+- ld e,l
++ and 7
++ jp nz,rest_row3
++ ld a,e
++ add a,32
++ ld e,a
++ ld l,a
++ jp c,rest_row3
+  ld a,d
+- sub 24
++ sub 8
+  ld d,a
++ ld a,h
++ sub 8
++ ld h,a
++ jp rest_row3
++rest_row4:
+  ldi
+  ldi
+  ldi
+- ld a,(rest_rows)
+- dec a
+- ld (rest_rows),a
+- jp nz,rest_row3
+- ret
+-rest_row5:
+- ld hl,(rest_scan)
+- ld e,(hl)
+- inc hl
+- ld d,(hl)
+- inc hl
+- ld (rest_scan),hl
+- ld a,(rest_col)
+- add a,e
++ ldi
++ ret po
++ ld a,e
++ sub 4
+  ld e,a
++ ld l,a
++ inc d
++ inc h
+  ld a,d
+- add a,152
+- ld d,a
+- ex de,hl
+- ld d,h
+- ld e,l
++ and 7
++ jp nz,rest_row4
++ ld a,e
++ add a,32
++ ld e,a
++ ld l,a
++ jp c,rest_row4
+  ld a,d
+- sub 24
++ sub 8
+  ld d,a
++ ld a,h
++ sub 8
++ ld h,a
++ jp rest_row4
++rest_row5:
+  ldi
+  ldi
+  ldi
+  ldi
+  ldi
+- ld a,(rest_rows)
+- dec a
+- ld (rest_rows),a
+- jp nz,rest_row5
+- ret
+-rest_row4:
+- ld hl,(rest_scan)
+- ld e,(hl)
+- inc hl
+- ld d,(hl)
+- inc hl
+- ld (rest_scan),hl
+- ld a,(rest_col)
+- add a,e
++ ret po
++ ld a,e
++ sub 5
+  ld e,a
++ ld l,a
++ inc d
++ inc h
+  ld a,d
+- add a,152
+- ld d,a
+- ex de,hl
+- ld d,h
+- ld e,l
++ and 7
++ jp nz,rest_row5
++ ld a,e
++ add a,32
++ ld e,a
++ ld l,a
++ jp c,rest_row5
+  ld a,d
+- sub 24
++ sub 8
+  ld d,a
+- ldi
+- ldi
+- ldi
+- ldi
+- ld a,(rest_rows)
+- dec a
+- ld (rest_rows),a
+- jp nz,rest_row4
+- ret
++ ld a,h
++ sub 8
++ ld h,a
++ jp rest_row5
+ 
+ ; Present completed bytes from RAM. No screen erase stage is ever visible.
+ sprite_present:
+  call composite_setup
+- ld a,(spr_cols)
++ ex af,af'
++ ld a,d
++ add a,128                ; Origen: imagen de trabajo C000; destino: pantalla
++ ld h,a
++ ld l,e
++ ex af,af'
+  cp 4
+  jp z,pres_row4
+  cp 5
+@@ -414,108 +413,111 @@
+  jp z,pres_row3
+  jp pres_row2
+ pres_row2:
+- ld hl,(rest_scan)
+- ld e,(hl)
+- inc hl
+- ld d,(hl)
+- inc hl
+- ld (rest_scan),hl
+- ld a,(rest_col)
+- add a,e
+- ld e,a
+- ld h,d
+- ld l,e
+- ld a,h
+- add a,128
+- ld d,a
+- ex de,hl
+  ldi
+  ldi
+- ld a,(rest_rows)
+- dec a
+- ld (rest_rows),a
++ ret po
++ ld a,e
++ sub 2
++ ld e,a
++ ld l,a
++ inc d
++ inc h
++ ld a,d
++ and 7
+  jp nz,pres_row2
+- ret
+-pres_row3:
+- ld hl,(rest_scan)
+- ld e,(hl)
+- inc hl
+- ld d,(hl)
+- inc hl
+- ld (rest_scan),hl
+- ld a,(rest_col)
+- add a,e
++ ld a,e
++ add a,32
+  ld e,a
+- ld h,d
+- ld l,e
+- ld a,h
+- add a,128
++ ld l,a
++ jp c,pres_row2
++ ld a,d
++ sub 8
+  ld d,a
+- ex de,hl
++ ld a,h
++ sub 8
++ ld h,a
++ jp pres_row2
++pres_row3:
+  ldi
+  ldi
+  ldi
+- ld a,(rest_rows)
+- dec a
+- ld (rest_rows),a
++ ret po
++ ld a,e
++ sub 3
++ ld e,a
++ ld l,a
++ inc d
++ inc h
++ ld a,d
++ and 7
+  jp nz,pres_row3
+- ret
+-pres_row4:
+- ld hl,(rest_scan)
+- ld e,(hl)
+- inc hl
+- ld d,(hl)
+- inc hl
+- ld (rest_scan),hl
+- ld a,(rest_col)
+- add a,e
++ ld a,e
++ add a,32
+  ld e,a
+- ld h,d
+- ld l,e
+- ld a,h
+- add a,128
++ ld l,a
++ jp c,pres_row3
++ ld a,d
++ sub 8
+  ld d,a
+- ex de,hl
++ ld a,h
++ sub 8
++ ld h,a
++ jp pres_row3
++pres_row4:
+  ldi
+  ldi
+  ldi
+  ldi
+- ld a,(rest_rows)
+- dec a
+- ld (rest_rows),a
++ ret po
++ ld a,e
++ sub 4
++ ld e,a
++ ld l,a
++ inc d
++ inc h
++ ld a,d
++ and 7
+  jp nz,pres_row4
+- ret
+-
+-pres_row5:
+- ld hl,(rest_scan)
+- ld e,(hl)
+- inc hl
+- ld d,(hl)
+- inc hl
+- ld (rest_scan),hl
+- ld a,(rest_col)
+- add a,e
++ ld a,e
++ add a,32
+  ld e,a
+- ld h,d
+- ld l,e
+- ld a,h
+- add a,128
++ ld l,a
++ jp c,pres_row4
++ ld a,d
++ sub 8
+  ld d,a
+- ex de,hl
++ ld a,h
++ sub 8
++ ld h,a
++ jp pres_row4
++pres_row5:
+  ldi
+  ldi
+  ldi
+  ldi
+  ldi
+- ld a,(rest_rows)
+- dec a
+- ld (rest_rows),a
++ ret po
++ ld a,e
++ sub 5
++ ld e,a
++ ld l,a
++ inc d
++ inc h
++ ld a,d
++ and 7
+  jp nz,pres_row5
+- ret
+-
+-rest_col: db 0
+-rest_scan: dw 0
+-rest_rows: db 0
++ ld a,e
++ add a,32
++ ld e,a
++ ld l,a
++ jp c,pres_row5
++ ld a,d
++ sub 8
++ ld d,a
++ ld a,h
++ sub 8
++ ld h,a
++ jp pres_row5
+ 
+ ; --------------- PROGRESSIVE REPAIR OF PHYSICAL VRAM ---------------------
+ ; Last resort for a persistent stray pixel in *actual* Spectrum VRAM, which
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' FINAL_1_0_1/src/arcade_rules_v18.asm hal/src/arcade_rules_v18.asm
+--- FINAL_1_0_1/src/arcade_rules_v18.asm	2026-11-11 22:37:15.899920871 +0100
++++ V1_1/src/arcade_rules_v18.asm	2026-11-11 23:57:29.980740086 +0100
+@@ -97,10 +97,9 @@
+ 
+ ; Test A down: bit0 from ULA row FD (Q/A). Only press EDGE activates field.
+ shield_try_activate:
+- ld bc,0xfdfe                ; A is keyboard bit0, active low.
+- in a,(c)                   ; Read current raw keyboard state.
+- and 1                      ; Z if A is pressed.
+- jp nz,shield_key_release   ; Release resets edge latch.
++ ld a,(input_bits)          ; V1.1: A/Q, 8/9 o joystick arriba/abajo.
++ and 12
++ jp z,shield_key_release    ; Release resets edge latch.
+  ld a,(shield_key_held)      ; Is A still being held from a prior check?
+  or a                       ; Z = new key press.
+  ret nz                     ; Held key cannot reactivate by itself.
+@@ -159,10 +158,7 @@
+  ld (ix+2),3                ; Replace bird with short explosion.
+  ld (ix+5),6                ; Six-update explosion, visible to the player.
+  call beep_shield_contact
+- ld a,(kills)               ; Read common score accounting.
+- inc a                       ; Same 10-point award in this first prototype.
+- ld (kills),a               ; Update kills.
+- call score_draw             ; Refresh numeric HUD score from valid game source.
++ call score_add_kill         ; V1.1: marcador de 16 bits y vida extra.
+ shield_bird_next:
+  ld de,6                     ; Size of enemy record.
+  add ix,de                   ; Next bird.
+@@ -185,27 +181,35 @@
+  cp 185                      ; Bottom cutoff before 4px sprite leaves view.
+  jr nc,enemy_bullet_remove   ; Deactivate and restore old footprint.
+  ld (ix+1),a                ; Commit new vertical position.
+- ld b,a                     ; Save current shot Y for collision test.
+- ld a,(ship_y)              ; Player top Y (fixed 152).
+- sub 3                       ; Permit 3px leading tolerance.
+- cp b                        ; Shot below player top?
+- jr nc,enemy_bullet_next     ; Still above player's collision box.
+- ld a,(ship_y)              ; Ship Y once more.
+- add a,23                   ; Ship ends at this pixel.
+- cp b                        ; Shot below ship bottom?
+- jr c,enemy_bullet_next      ; No collision.
+- ld a,(ix+0)                ; Projectile left X.
+- ld c,a                     ; Store shot X.
+- ld a,(ship_x)              ; Ship left X.
+- add a,24                   ; Ship right X.
+- cp c                        ; Shot past right?
+- jr c,enemy_bullet_next      ; No hit.
+- ld a,c                     ; Shot left.
+- add a,3                    ; Shot's small horizontal width.
+- ld c,a                     ; Shot right.
+- ld a,(ship_x)              ; Ship left.
+- cp c                        ; Ship entirely to right of shot?
+- jr nc,enemy_bullet_next     ; No hit.
++ ; V1.1: caja de impacto con la silueta del ESF, no el cuadrado de 24x24:
++ ; morro estrecho (x+9..x+14) en las 13 primeras filas, alas (x+3..x+20) debajo.
++ add a,3                    ; Fila inferior del proyectil.
++ ld b,a
++ ld a,(ship_y)
++ ld c,a
++ ld a,b
++ sub c                      ; A = fila de la nave que toca el proyectil.
++ jr c,enemy_bullet_next     ; Aun por encima del morro.
++ cp 27
++ jr nc,enemy_bullet_next    ; Ya por debajo de la nave.
++ ld de,0x0f09               ; D = borde derecho (exclusivo), E = izquierdo.
++ cp 13
++ jr c,eb_hitbox
++ ld de,0x1503
++eb_hitbox:
++ ld a,(ship_x)
++ add a,e
++ ld e,a
++ ld a,(ship_x)
++ add a,d
++ ld d,a
++ ld a,(ix+0)                ; Proyectil: x .. x+2.
++ cp d
++ jr nc,enemy_bullet_next
++ add a,3
++ cp e
++ jr c,enemy_bullet_next
++ jr z,enemy_bullet_next
+  ld (ix+2),0                ; Projectile removed on collision.
+  ld a,(shield_state)         ; Does shield protect the player?
+  cp 1                        ; Active field neutralizes the projectile.
+@@ -219,35 +223,47 @@
+  add ix,de                   ; IX=next slot.
+  pop bc                      ; Restore bullet counter.
+  djnz enemy_bullet_move_loop ; Process three shots.
+- ld a,(wave_stage)          ; 0 formation /1 hunters /2 kamikaze /3 MOAI.
+- ld b,63                     ; Crow formation: occasional fire / 64 updates.
+- cp 1                        ; Hunter wave fires twice as often.
+- jr nz,enemy_fire_stage2     ; Otherwise check first/third wave.
+- ld b,31                     ; Hunter cadence: one shot every 32 ticks.
+-enemy_fire_stage2:
+- cp 2                        ; Kamikaze wave fires more frequently still.
+- jr nz,enemy_fire_mask      ; Preserve chosen cadence.
+- ld b,7                      ; Normal kamikazes: one attempt every eight updates.
+- ld a,(wave_cycle)          ; V2.8.2: soften only the FIRST cycle (phase 01).
+- or a                       ; After the first MOAI, restore original cadence.
+- jr nz,enemy_fire_mask
+- ld b,15                    ; Phase 01: one attempt every 16 updates.
+-enemy_fire_mask:
++ ; V1.1: cadencia por temporizador en ticks de 25/s (antes mascaras de
++ ; frame_index a un ritmo que variaba entre 12 y 17 ticks/s segun la escena).
+  ld a,(wave_stage)
+  cp 3
+- jr nz,enemy_fire_regular
++ jr nz,enemy_fire_countdown
+  ld a,(boss_hp)            ; No laser fire during MOAI defeat sequence.
+  or a
+  ret z
+- ld b,15                   ; Subsequent MOAI: 1 shot / 16 logic ticks.
++enemy_fire_countdown:
++ ld a,(enemy_fire_cd)
++ or a
++ jr z,enemy_fire_due
++ dec a
++ ld (enemy_fire_cd),a
++ ret
++enemy_fire_due:
++ ld a,(wave_stage)
++ ld e,a
++ ld d,0
++ ld hl,fire_period_first
+  ld a,(wave_cycle)
+- or a                       ; First encounter is cycle zero.
+- jr nz,enemy_fire_regular
+- ld b,31                   ; First MOAI: 1 shot / 32 logic ticks.
+-enemy_fire_regular:
+- ld a,(frame_index)          ; Sample current global frame.
+- and b                       ; Mask represents power-of-two shot cadence.
+- ret nz                      ; No spawn until next matching tick.
++ or a
++ jr z,enemy_fire_period
++ ld hl,fire_period_later
++enemy_fire_period:
++ add hl,de
++ ld a,(wave_cycle)          ; -3 ticks por cada MOAI derrotado a partir del segundo.
++ or a
++ jr z,enemy_fire_period_ok
++ dec a
++ ld b,a
++ add a,a
++ add a,b
++ ld b,a
++ ld a,(hl)
++ sub b
++ jr enemy_fire_period_set
++enemy_fire_period_ok:
++ ld a,(hl)
++enemy_fire_period_set:
++ ld (enemy_fire_cd),a
+  ld ix,enemy_bullet_slots    ; Find first inactive slot.
+  ld b,3                      ; Search up to three.
+ enemy_bullet_find:
+@@ -307,25 +323,17 @@
+  ld (ix+0),a                ; New bullet X.
+  ld a,(iy+1)                ; Bird Y.
+  add a,15                   ; Spawn directly underneath 16px enemy.
+- cp 180                      ; Prevent near-edge shots.
+- ret nc                      ; Don't spawn offscreen.
++ cp 109                      ; V1.1: nunca a menos de 43px del morro: siempre esquivable.
++ ret nc
+  ld (ix+1),a                ; New downward shot Y.
+  ld (ix+2),1                 ; Activate this free projectile slot.
+  call beep_enemy_fire
+  ret                         ; Render it in the compositing pass.
+ 
+ boss_bullet_spawn:
+- ; Keep BOTH eyes alternating after changing first MOAI cadence to /32.
+- ld a,(wave_cycle)
+- or a
+- jr nz,boss_bullet_normal_eye
+- ld a,(frame_index)
+- and 32                     ; 32-frame cadence: switch eyes every shot.
+- jr boss_bullet_eye_select
+-boss_bullet_normal_eye:
+- ld a,(frame_index)
+- and 16                     ; Later MOAI: original 16-frame alternation.
+-boss_bullet_eye_select:
++ ld a,(boss_eye)            ; V1.1: un ojo y luego el otro, siempre.
++ xor 1
++ ld (boss_eye),a
+  ld a,85                   ; MOAI left eye.
+  jr z,boss_bullet_left
+  ld a,109                  ; MOAI right eye.
+@@ -343,20 +351,7 @@
+  ld b,3                      ; Render three records maximum.
+ enemy_bullet_draw_loop:
+  push bc                      ; Sprite renderer destroys BC.
+- ld a,(ix+2)                ; Active flag.
+- or a                        ; Skip empty projectile.
+- jr z,enemy_bullet_draw_next
+- ld hl,shot_phase_ptrs       ; Reuse native player bullet data (one-bit sprite).
+- ld (spr_data),hl           ; Set table of eight horizontal pixel alignments.
+- ld a,(ix+0)                ; Bullet X.
+- ld (spr_x),a               ; Pass sprite x to renderer.
+- ld a,(ix+1)                ; Bullet Y.
+- ld (spr_y),a               ; Pass sprite y.
+- ld a,2                     ; Standard bullet renderer uses two bytes wide.
+- ld (spr_cols),a            ; Width including sub-byte shifts.
+- ld a,4                     ; Four rows per bullet.
+- ld (spr_height),a          ; Rendered height.
+- call sprite_render         ; OR onto private RAM frame (not native VRAM).
++ call bullet_draw_ix         ; V1.1: mismo dibujo rapido que las balas propias.
+ enemy_bullet_draw_next:
+  ld de,3                     ; Advance to next projectile.
+  add ix,de                   ; IX=next record.
+@@ -370,7 +365,8 @@
+  cp 1                        ; 1 means complete protection.
+  ret z                       ; Field cancels body collisions.
+  ld a,(shield_invulnerable)  ; Respawn grace period from 50Hz interrupt.
+- or a                        ; Only 0 means vulnerable.
++ ld hl,grace_irqs           ; V1.1: mas la gracia al reaparecer.
++ or (hl)
+  ret nz                      ; Temporarily invulnerable after hit.
+  ld ix,enemy_slots          ; Scan live birds.
+  ld b,6                      ; Six opponents.
+@@ -381,22 +377,27 @@
+  jr z,ship_hit_bird_next    ; Blast pixels are not physical enemies.
+  or a                        ; Is enemy live?
+  jr z,ship_hit_bird_next     ; Skip inactive enemy.
++ ; V1.1: cajas ajustadas a los dibujos (enemigo x+2..x+13, nave x+4..x+19,
++ ; y solo si el enemigo pasa del morro): sin choques por esquinas vacias.
+  ld a,(ix+1)                ; Enemy Y.
+- cp 176                      ; Bottom of ship row.
++ cp 172
+  jr nc,ship_hit_bird_next    ; Too low.
+- cp 137                      ; Enemy bottom above player? 
++ cp 141
+  jr c,ship_hit_bird_next     ; Too high.
+  ld a,(ix+0)                ; Enemy X.
+- ld c,a                     ; Save enemy left.
+- ld a,(ship_x)              ; Ship left.
+- add a,24                   ; Ship right.
+- cp c                        ; Enemy starts further right?
++ add a,2
++ ld c,a                     ; Enemy left.
++ ld a,(ship_x)
++ add a,20                   ; Ship right (exclusive).
++ cp c
+  jr c,ship_hit_bird_next     ; No overlap.
+- ld a,c                     ; Enemy left.
+- add a,16                   ; Enemy right.
+- ld c,a                     ; Store right.
+- ld a,(ship_x)              ; Ship left.
+- cp c                        ; Enemy entirely left?
++ jr z,ship_hit_bird_next
++ ld a,c
++ add a,12
++ ld c,a                     ; Enemy right (exclusive).
++ ld a,(ship_x)
++ add a,4                    ; Ship left.
++ cp c
+  jr nc,ship_hit_bird_next    ; No overlap.
+  ld (ix+2),3                ; Contact explosion, not an instant disappearance.
+  ld (ix+5),6                ; Six visible blast updates; excludes repeat hits.
+@@ -411,7 +412,8 @@
+ 
+ player_take_hit:
+  ld a,(shield_invulnerable)  ; Is post-hit grace period active?
+- or a                        ; Zero = can lose a life.
++ ld hl,grace_irqs           ; V1.1: tambien durante la gracia al reaparecer.
++ or (hl)                     ; Zero = can lose a life.
+  ret nz                      ; One death cannot remove multiple lives.
+  ld a,(player_lives)         ; Remaining life icons.
+  or a                        ; Guard against negative lives.
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' FINAL_1_0_1/src/gameover_v20.asm hal/src/gameover_v20.asm
+--- FINAL_1_0_1/src/gameover_v20.asm	2026-11-11 22:37:15.899973138 +0100
++++ V1_1/src/gameover_v20.asm	2026-11-11 23:20:04.172470793 +0100
+@@ -39,15 +39,11 @@
+  call gameover_prompt_show  ; Reveal pre-existing pixel text by ATTR change.
+ gameover_wait_release:
+  halt
+- ld bc,0x7ffe               ; SPACE row (active-low, bit 0).
+- in a,(c)
+- and 1
++ call any_fire_pressed      ; V1.1: cualquier fuego (teclado, Sinclair, Kempston).
+  jr z,gameover_wait_release ; Require released SPACE before allowing return.
+ gameover_wait_press:
+  halt
+- ld bc,0x7ffe
+- in a,(c)
+- and 1
++ call any_fire_pressed
+  jr nz,gameover_wait_press
+  jp title_session_start     ; Exactly one SPACE returns to TITLE, not game.
+ 
+@@ -75,36 +71,17 @@
+  xor a
+  ld e,13
+  call gameover_digit_draw
+- xor a
++ call score_to_digits        ; V1.1: marcador de 16 bits.
++ ld a,(score_digits)
+  ld e,14
+  call gameover_digit_draw
+- ld a,(kills)
+- ld c,0
+-gameover_div100:
+- cp 100
+- jr c,gameover_100_done
+- sub 100
+- inc c
+- jr gameover_div100
+-gameover_100_done:
+- ld (go_remainder),a
+- ld a,c
++ ld a,(score_digits+1)
+  ld e,15
+  call gameover_digit_draw
+- ld a,(go_remainder)
+- ld c,0
+-gameover_div10:
+- cp 10
+- jr c,gameover_10_done
+- sub 10
+- inc c
+- jr gameover_div10
+-gameover_10_done:
+- ld (go_remainder),a
+- ld a,c
++ ld a,(score_digits+2)
+  ld e,16
+  call gameover_digit_draw
+- ld a,(go_remainder)
++ ld a,(score_digits+3)
+  ld e,17
+  call gameover_digit_draw
+  xor a
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' FINAL_1_0_1/src/gameplay.asm hal/src/gameplay.asm
+--- FINAL_1_0_1/src/gameplay.asm	2026-11-11 22:37:15.899989158 +0100
++++ V1_1/src/gameplay.asm	2026-11-11 23:57:29.980256587 +0100
+@@ -18,6 +18,16 @@
+  ld (led_anim_clock),a      ; Reset LED scan cadence.
+  ld (player_respawn_pending),a ; No pending respawn on new game.
+  ld (kills),a
++ ld (tick_irqs),a            ; V1.1: el primer tick empieza con el reloj a cero.
++ ld (score_words),a          ; V1.1: marcador de 16 bits a cero.
++ ld (score_words+1),a
++ ld (life_next),a
++ ld (grace_irqs),a
++ ld (boss_eye),a
++ ld (card_ticks),a
++ ld a,32                     ; Primer disparo enemigo tras 1,3 s.
++ ld (enemy_fire_cd),a
++ xor a
+  ld (wave_done),a
+  ld (wave_stage),a           ; Start with slower formation on game boot.
+  ld (wave_repeat),a          ; Every wave family appears TWICE per boss circuit.
+@@ -28,10 +38,13 @@
+  ld (wave_cycle),a           ; Number of completed MOAI circuits, capped at four.
+  ld a,1
+  ld (phase_number),a
+- ld hl,wave_initial
+- ld de,enemy_slots
+- ld bc,36
++ ld hl,enemy_slots           ; V1.1: la primera oleada entra tras su cartel.
++ ld de,enemy_slots+1
++ ld bc,35
++ ld (hl),0
+  ldir
++ ld a,1
++ ld (wave_done),a
+  ld hl,bullet_slots
+  ld de,bullet_slots+1
+  ld bc,26
+@@ -41,7 +54,7 @@
+  call shield_init          ; V1.8: arm real-time shield, lives and enemy projectiles.
+  call color_shadow_init      ; Snapshot current VRAM color attrs into private 768-byte RAM plane.
+  call led_frame_apply        ; Only the upper warning lamp begins BRIGHT; other two start dim.
+- ret
++ jp wave_card_start          ; V1.1: cartel OLEADA 1 (tras copiar los atributos).
+ 
+ combat_tick:
+  ; Keep OLD positions and animation phase: no long whole-wave erase interval.
+@@ -66,6 +79,7 @@
+  ld (ship_old_y),a
+  ; shield_previous_state tracks LAST PRESENTED frame, not current IM2 state.
+  ; The interrupt may expire the shield before this update starts.
++ call input_poll             ; V1.1: una sola lectura de mandos por tick.
+  call player_respawn_tick
+  call player_keys
+  ; Snapshot shield visibility for this entire bitmap+attribute frame.
+@@ -103,7 +117,9 @@
+  call wave_paint_new         ; Build full new enemy palette before changing visible ULA attributes.
+  call player_paint_new       ; Ship palette has final priority in the shadow attribute map.
+  call composite_update      ; Compose/present all sprite pixels without whitening on-screen color.
++ call card_draw             ; V1.1: texto del cartel OLEADA encima de todo.
+  call color_shadow_present  ; Copy fully composed 8x8 attributes in one final pass to VRAM.
++ call card_attr_present     ; V1.1: color del cartel OLEADA (8 celdas).
+  ld a,(shield_frame_state)
+  ld (shield_previous_state),a ; The exact shield visible in last COMPOSED frame.
+  call compositor_scrub      ; Progressive repair of stray pixel bytes only.
+@@ -142,8 +158,32 @@
+ ; $F100..$F3FF = private attributes; $5800..$5AFF = native screen attributes.
+ ; Clobbers AF BC DE HL IX, preserves IY, restores caller stack on every path.
+ color_shadow_present:
++ ; V1.1: la huella antigua de un enemigo solo se copia si no coincide con la
++ ; nueva (misma celda 8x8): la nueva ya cubre esas 9 celdas.
+  ld ix,old_enemy_slots      ; IX points to last frame's enemy status records.
+- call color_present_six     ; Commit locations enemies LEFT behind this tick.
++ ld iy,enemy_slots
++ ld b,6
++color_old_pair_loop:
++ push bc
++ ld a,(iy+2)
++ or a
++ jr z,color_old_pair_present
++ ld a,(ix+0)
++ xor (iy+0)
++ and 0xf8
++ jr nz,color_old_pair_present
++ ld a,(ix+1)
++ xor (iy+1)
++ and 0xf8
++ jr z,color_old_pair_next
++color_old_pair_present:
++ call color_present_enemy
++color_old_pair_next:
++ ld de,6
++ add ix,de
++ add iy,de
++ pop bc
++ djnz color_old_pair_loop
+  ld ix,enemy_slots          ; IX points to current frame's enemy status records.
+  call color_present_six     ; Commit current enemy colors including overlaps.
+  ld a,(ship_old_x)         ; A = previous ESF x position in pixels.
+@@ -909,38 +949,56 @@
+  ld (spr_height),a
+  jp sprite_present
+ 
+-; 4-byte-wide guard (1 byte left + 2 projectile bytes + 1 right).
+-; It is safe because the player is clamped to X>=8 and X<=163, thus shot X>=16.
+-; All copied bytes come from the FINAL composed frame, never blank direct VRAM.
++; V1.1: rectangulos de proyectil de 2 bytes x 4 filas, exactamente los bytes
++; que pinta sprite_render (cols=2 desde x>>3). Sin columnas de guarda y con
++; una preparacion propia de ~200 T (antes ~500 T por rectangulo, 3 por bala).
+ comp_restore_bullet_ix:
+- ld a,(ix+2)          ; Bullet old-state active flag.
+- or a                  ; Z if no previous projectile.
+- ret z                 ; Nothing to restore.
+- ld a,(ix+0)          ; Bullet X.
+- sub 8                 ; Start one byte before its actual pixel footprint.
+- ld (spr_x),a          ; Protected 4-byte region X origin.
+- ld a,(ix+1)          ; Bullet Y.
+- ld (spr_y),a          ; Protected 4-row region Y origin.
+- ld a,4                ; 4 byte columns (including two safety columns).
+- ld (spr_cols),a       ; Save rectangle width.
+- ld a,4                ; Actual bullet height in pixels.
+- ld (spr_height),a     ; Save rectangle height.
+- jp sprite_restore     ; D800 sky -> C000 work; other objects redrawn later.
++ call bullet_rect_dest      ; DE = destino base 4000; NC = no cabe / inactivo
++ ret nc
++ ld a,d
++ add a,0x98                 ; Origen: cielo inmutable D800..
++ ld h,a
++ ld l,e
++ add a,-24                  ; Destino: imagen de trabajo C000..
++ ld d,a
++ ld bc,8
++ jp rest_row2
+ 
+ comp_present_bullet_ix:
+- ld a,(ix+2)          ; Test active previous/current bullet.
+- or a                  ; Z means empty record.
+- ret z                 ; No presentation necessary.
+- ld a,(ix+0)          ; Bullet X in pixels.
+- sub 8                 ; One-byte safety margin left.
+- ld (spr_x),a          ; Guard-banded pixel origin.
+- ld a,(ix+1)          ; Bullet Y in pixels.
+- ld (spr_y),a          ; Protected row origin.
+- ld a,4                ; 4 byte columns including two guard columns.
+- ld (spr_cols),a       ; Store width.
+- ld a,4                ; 4 pixel rows.
+- ld (spr_height),a     ; Store height.
+- jp sprite_present     ; Finished work RAM -> real screen, no black-hole erase.
++ call bullet_rect_dest
++ ret nc
++ ld a,d
++ add a,128                  ; Origen: trabajo C000..; destino: pantalla
++ ld h,a
++ ld l,e
++ ld bc,8
++ jp pres_row2
++
++; IX = registro [x,y,activo]. Carry = activo y cabe (y <= 188); DE = pantalla.
++bullet_rect_dest:
++ ld a,(ix+2)
++ or a
++ ret z                      ; Z con carry 0 (OR lo pone a 0)
++ ld a,(ix+1)
++ cp 189
++ ret nc
++ ld l,a
++ ld h,0
++ add hl,hl
++ ld de,scanline_table
++ add hl,de
++ ld e,(hl)
++ inc hl
++ ld d,(hl)
++ ld a,(ix+0)
++ rrca
++ rrca
++ rrca
++ and 31
++ add a,e
++ ld e,a
++ scf
++ ret
+ 
+ ; Sound effects are bounded (~1 ms, not a blocking music player).
+ ; FE port bit 4 drives the beeper. Border remains black.
+@@ -1013,6 +1071,11 @@
+  ret z                      ; Never respawn when final life is exhausted.
+  xor a
+  ld (player_respawn_pending),a
++ ld (enemy_bullet_slots+2),a ; V1.1: al reaparecer no queda ningun disparo
++ ld (enemy_bullet_slots+5),a ; enemigo en el aire...
++ ld (enemy_bullet_slots+8),a
++ ld a,100                   ; ...y 2 s de invulnerabilidad (parpadeo) en vez de 1.
++ ld (grace_irqs),a
+  ld a,80
+  ld (ship_x),a              ; Center re-entry (sprite x=80, playable 24..160).
+  ret
+@@ -1025,7 +1088,8 @@
+  jp nc,player_draw_death
+  cp 50
+  ret nc
+- or a
++ ld hl,grace_irqs           ; V1.1: parpadea mientras dura cualquier gracia.
++ or (hl)
+  jr z,player_draw_live
+  ld a,(frame_index)
+  and 2
+@@ -1097,10 +1161,9 @@
+  cp 50
+  ret nc
+  ; 1984 arcade: the ship cannot change Y, and A now operates the shield.
+- ld bc,0xdffe           ; ULA half-row P/O, active-low, no ROM calls.
+- in a,(c)              ; Read all keys on that keyboard row.
+- and 2                 ; Bit 1 = O (left).
+- jp nz,player_no_left  ; No movement when key released.
++ ld a,(input_bits)     ; V1.1: O, 6 o joystick a la izquierda.
++ and 2
++ jp z,player_no_left   ; No movement when key released.
+  ld a,(ship_x)         ; Pixel X left edge, renderer uses a shifted 24x24 sprite.
+  cp 27                 ; A 3px move below 27 would cross the x=24 limit.
+  jp nc,player_left_step
+@@ -1111,10 +1174,9 @@
+  sub 3                 ; Three pixel lateral step.
+  ld (ship_x),a         ; Store new horizontal position.
+ player_no_left:
+- ld bc,0xdffe          ; Same P/O ULA row.
+- in a,(c)             ; Read current key state again.
+- and 1                ; Bit 0 = P (right).
+- jp nz,player_no_right
++ ld a,(input_bits)    ; V1.1: P, 7 o joystick a la derecha.
++ and 1
++ jp z,player_no_right
+  ld a,(ship_x)
+  cp 158                ; Three more pixels from 158 would cross X=160.
+  jp c,player_right_step
+@@ -1138,18 +1200,16 @@
+  cp 50
+  jr c,player_fire_live
+  ; Keep the FIRE edge latch correct while the fighter is off-screen.
+- ld bc,0x7ffe
+- in a,(c)
+- and 1
+- jr nz,player_fire_release
++ ld a,(input_bits)
++ and 16
++ jr z,player_fire_release
+  ld a,1
+  ld (fire_held),a
+  ret
+ player_fire_live:
+- ld bc,0x7ffe         ; BC selects keyboard half-row containing SPACE
+- in a,(c)            ; A reads active-low keyboard bits from port $FE
+- and 1               ; Z=1 when SPACE is depressed; discard other bits
+- jp nz,player_fire_release ; released => reset edge detector
++ ld a,(input_bits)    ; V1.1: SPACE, 0 o fuego del joystick
++ and 16
++ jp z,player_fire_release ; released => reset edge detector
+  ld a,(fire_held)     ; A=1 when previous sample already saw a press
+  or a                ; test whether we have already fired this press
+  ret nz               ; held => no new bullet, regardless of frame rate
+@@ -1187,6 +1247,9 @@
+  ld a,(wave_stage)
+  cp 3
+  jp z,boss_update           ; Boss stage driven by HP, never respawn birds.
++ ld a,(card_ticks)          ; V1.1: cartel OLEADA n en curso.
++ or a
++ jp nz,wave_card_tick
+  ld a,(wave_done)          ; Has last formation been cleared or escaped?
+  or a                      ; Zero while birds still live.
+  jp z,wave_update_live     ; Continue current wave.
+@@ -1209,6 +1272,8 @@
+ wave_stage_store:
+  ld (wave_stage),a
+ wave_spawn:
++ jp wave_card_start         ; V1.1: primero el cartel; la formacion entra al final.
++wave_spawn_now:
+  ld hl,wave_initial
+  ld a,(wave_stage)
+  or a
+@@ -1261,6 +1326,9 @@
+  inc a                      ; Per-tick dive speed 1/2/3px.
+  ld b,a
+  ld a,(wave_cycle)         ; Each MOAI defeated increases the tempo.
++ inc a                      ; V1.1: +1 px cada DOS MOAI (a 25 ticks/s +1 por MOAI
++ or a                       ; llevaba el picado a 175 px/s; ahora el tope es 125).
++ rra
+  add a,b
+  ld b,a
+  ld a,(wave_stage)
+@@ -1779,8 +1847,8 @@
+  or a
+  ret z
+  ld a,(frame_index)
+- and 15
+- cp 8
++ and 31                   ; V1.1: 1,28 s entre rafagas (a 25 ticks/s).
++ cp 16
+  ret nz                   ; Short volleys, both on the SAME beat.
+  ld a,(hunter_pair_active)
+  cp 2
+@@ -1829,7 +1897,7 @@
+  ld (ix+0),a
+  ld a,(iy+1)
+  add a,15
+- cp 180
++ cp 109                    ; V1.1: igual que el resto: disparo siempre esquivable.
+  ret nc
+  ld (ix+1),a
+  ld (ix+2),1
+@@ -2169,10 +2237,7 @@
+  ld (iy+2),3             ; 3-tick explosion state, prevents double hits.
+  ld (iy+5),6             ; Six visible blast updates (~0.25s at 25Hz).
+  ld (ix+2),0
+- ld a,(kills)
+- inc a
+- ld (kills),a
+- call score_draw
++ call score_add_kill     ; V1.1: marcador de 16 bits y vida extra.
+  call beep_enemy_destroy
+  jp bullet_check_done
+ bullet_no_hit:
+@@ -2208,10 +2273,7 @@
+  ld (enemy_bullet_slots+5),a
+  ld (enemy_bullet_slots+8),a
+ boss_bullet_hit_score:
+- ld a,(kills)
+- inc a
+- ld (kills),a
+- call score_draw
++ call score_add_kill
+  call beep_enemy_destroy
+  jp bullet_next
+ bullet_next:
+@@ -2234,52 +2296,42 @@
+  djnz bullet_draw_loop
+  ret
+ bullet_draw_ix:
+- ld a,(ix+2)
+- or a
+- ret z
+- ld hl,shot_phase_ptrs
+- ld (spr_data),hl
++ ; V1.1: dibujo OR directo de 2x4 bytes (mismo resultado que sprite_render
++ ; con shot_phase_ptrs, sin pasar por las variables spr_*).
++ call bullet_rect_dest       ; DE = pantalla; NC = inactivo o no cabe
++ ret nc
+  ld a,(ix+0)
+- ld (spr_x),a
+- ld a,(ix+1)
+- ld (spr_y),a
+- ld a,2
+- ld (spr_cols),a
+- ld a,4
+- ld (spr_height),a
+- call sprite_render
+- ret
++ and 7
++ add a,a
++ ld l,a
++ ld h,0
++ ld bc,shot_phase_ptrs
++ add hl,bc
++ ld a,(hl)
++ inc hl
++ ld h,(hl)
++ ld l,a                      ; HL = fase desplazada del proyectil
++ ld a,d
++ add a,128
++ ld d,a                      ; DE = imagen de trabajo
++ ld b,4
++ jp sprite_row2
+ 
+  ; Four rightmost score digits: kills x 10, up to 2550 without overflow.
+  ; This runs only on a kill and writes the *native* HUD bitmap in screen RAM.
+ score_draw:
+- ld a,(kills)
+- ld c,0
+-score_div100:
+- cp 100
+- jp c,score_100_done
+- sub 100
+- inc c
+- jp score_div100
+-score_100_done:
+- ld (score_remainder),a
+- ld a,c
++ ; V1.1: puntos = score_words*10 (antes un byte: a los 2.560 puntos volvia a 0).
++ call score_to_digits
++ ld a,(score_digits)
++ ld e,26
++ call score_digit_draw
++ ld a,(score_digits+1)
+  ld e,27
+  call score_digit_draw
+- ld a,(score_remainder)
+- ld c,0
+-score_div10:
+- cp 10
+- jp c,score_10_done
+- sub 10
+- inc c
+- jp score_div10
+-score_10_done:
+- ld (score_remainder),a
+- ld a,c
++ ld a,(score_digits+2)
+  ld e,28
+  call score_digit_draw
+- ld a,(score_remainder)
++ ld a,(score_digits+3)
+  ld e,29
+  call score_digit_draw
+  xor a
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' FINAL_1_0_1/src/irq_im2_v15.asm hal/src/irq_im2_v15.asm
+--- FINAL_1_0_1/src/irq_im2_v15.asm	2026-11-11 22:37:15.900022620 +0100
++++ V1_1/src/irq_im2_v15.asm	2026-11-11 23:16:40.631572004 +0100
+@@ -36,9 +36,16 @@
+ irq_im2_handler:
+  push af                 ; Save interrupted AF (including flags) before changing timer.
+  push hl                 ; Save interrupted HL because timer uses a 16-bit counter.
++ ld hl,tick_irqs         ; V1.1: cuenta las interrupciones del tick en curso.
++ inc (hl)
++ ld a,(game_paused)      ; V1.1: en pausa no corre ningun temporizador.
++ or a
++ jr nz,irq_paused
+  call shield_irq_tick    ; Exactly one 50 Hz hardware IRQ, even if renderer is slow.
+  call rush_rest_irq_tick   ; V2.6: 100 physical IRQ ticks per kamikaze regroup.
+  call gameover_irq_tick  ; Three-second GAME OVER input lockout (150 real IRQs).
++ call grace_irq_tick     ; V1.1: invulnerabilidad extra al reaparecer.
++irq_paused:
+  pop hl                  ; Restore HL exactly as interrupted.
+  pop af                  ; Restore A and original flags exactly.
+  ei                      ; Enable following interrupts after RETI as required by Z80.
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' FINAL_1_0_1/src/main.asm hal/src/main.asm
+--- FINAL_1_0_1/src/main.asm	2026-11-11 22:37:15.900035232 +0100
++++ V1_1/src/main.asm	2026-11-11 23:16:40.631228415 +0100
+@@ -7,6 +7,7 @@
+  ld sp,0xfff0               ; Reserve stack above EFFF: code begins at ORG $8000.
+  xor a
+  out (0xfe),a
++ call v11_boot_clear        ; V1.1: variables nuevas a cero ($F001..$F0FF).
+  call irq_im2_install       ; Install an isolated Z80 IM2 interrupt; no ROM keyboard/FRAMES writes.
+  ld a,0xa5                 ; A = sentinel for first free byte after the sky buffer ($EFFF).
+  ld (0xf000),a             ; Detect compositor writes beyond $EFFF on next game tick.
+@@ -58,8 +59,8 @@
+  cp 50                      ; Above 49: 1s explosion + 1s absence.
+  jp c,gameover_enter        ; No respawn on the final life.
+ main_gameplay_alive:
+- halt                       ; Wait for next 50Hz IRQ only once: tick renderer often spans >20ms.
+-                            ; With a 20-40ms update, two HALTs force an extra lost screen refresh.
++ call pause_check           ; V1.1: H = pausa.
++ call tick_wait             ; V1.1: ritmo fijo de 25 ticks/s (antes 12-17 y variable).
+  call combat_tick           ; One complete private-buffer composition and presentation.
+ 
+  jp main_loop
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' FINAL_1_0_1/src/stars_scroll_v13.asm hal/src/stars_scroll_v13.asm
+--- FINAL_1_0_1/src/stars_scroll_v13.asm	2026-11-11 22:37:15.900118175 +0100
++++ V1_1/src/stars_scroll_v13.asm	2026-11-11 23:50:50.426544646 +0100
+@@ -12,13 +12,45 @@
+ 
+ stars_v13_erase_old:
+  call stars_v13_select_bank    ; Work on alternating 16-star slices per update.
+- ld hl,stars_v13_cache        ; HL=previous/current star address records.
+- ld de,stars_v13_previous     ; DE=backup cache for later screen sync.
+- ld bc,96                     ; BC=32*(address-low,address-high,mask).
+- ldir                         ; Save old positions before moving their coordinates.
+- xor a                        ; A=0 indicates clear bit, not XOR drawing.
+- ld (plot_mode),a             ; Choose erase mode for shared renderer.
+- jp stars_v13_apply_selected  ; Clear moved-bank 16 previous bits in work.
++ ld hl,(stars_v13_active_cache) ; V1.1: solo se guarda la mitad que se mueve
++ ld de,(stars_v13_active_previous) ; (la otra mitad no cambia este tick).
++ ld bc,48
++ ldir
++ ; V1.1: borrado especializado de las 16 estrellas que se mueven: quita su bit
++ ; de la imagen de trabajo y repone ese bit del cielo inmutable (planeta/MOAI).
++ ld hl,(stars_v13_active_cache)
++ ld b,16
++stars_v11_clear_loop:
++ ld e,(hl)
++ inc hl
++ ld a,(hl)
++ add a,128
++ ld d,a                       ; DE = byte en la imagen de trabajo C000..
++ inc hl
++ ld c,(hl)                    ; C = bit de la estrella
++ inc hl
++ ld a,d
++ add a,24
++ ld d,a                       ; DE = mismo byte en el cielo D800..
++ ld a,(de)
++ and c                        ; Bit del cielo bajo la estrella.
++ ld (stars_v11_sky_bit),a
++ ld a,d
++ sub 24
++ ld d,a
++ ld a,c
++ cpl
++ ex de,hl
++ and (hl)
++ ex de,hl
++ push hl
++ ld hl,stars_v11_sky_bit
++ or (hl)
++ pop hl
++ ld (de),a
++ djnz stars_v11_clear_loop
++ ret
++stars_v11_sky_bit: db 0
+ 
+ stars_v13_move:
+  ld hl,(stars_v13_active_stars) ; HL=first record of selected 16-star slice.
+@@ -126,14 +158,43 @@
+ 
+ ; Update only 16 changed addresses. Mask data remains precomputed and unchanged.
+ stars_v13_cache_rebuild_half:
+- ld hl,(stars_v13_active_stars) ; Source star records.
+- push hl                        ; Move pointer to IX without nonstandard instructions.
+- pop ix                         ; IX=active star array.
+- ld hl,(stars_v13_active_cache) ; Destination cached address records.
+- push hl                        ; Move pointer to IY.
+- pop iy                         ; IY=active cache region.
+- ld b,16                        ; Only 16 changed stars per update.
+- jp stars_v13_cache_loop       ; Reuse Z80 address-generation loop.
++ ; V1.1: misma direccion que stars_v13_screen_addr, sin IX/IY ni variables.
++ ld hl,(stars_v13_active_stars) ; HL = registros (x,y,ritmo) de las 16 que se mueven.
++ ld de,(stars_v13_active_cache) ; DE = sus direcciones en la cache.
++ ld b,16
++stars_v11_rebuild_loop:
++ ld c,(hl)                      ; C = X
++ inc hl
++ ld a,(hl)                      ; A = Y
++ inc hl
++ inc hl
++ push hl
++ push de
++ ld l,a
++ ld h,0
++ add hl,hl
++ ld de,scanline_table
++ add hl,de
++ ld a,c
++ rrca
++ rrca
++ rrca
++ and 31
++ add a,(hl)
++ inc hl
++ ld h,(hl)
++ ld l,a                         ; HL = direccion de pantalla del pixel
++ pop de
++ ex de,hl
++ ld (hl),e
++ inc hl
++ ld (hl),d
++ inc hl
++ inc hl                         ; La mascara (X fija) no cambia.
++ ex de,hl
++ pop hl
++ djnz stars_v11_rebuild_loop
++ ret
+ 
+ ; Initialize fixed X-dependent masks (one-time cost, never in hot loop).
+ ; Clobbers AF/BC/DE/HL/IX/IY.
+@@ -158,63 +219,26 @@
+  djnz stars_v13_mask_init_loop ; Repeat 32.
+  ret                            ; All masks precomputed.
+ 
+-; Apply current cached stars to work RAM using bitwise OR or AND-not.
+-; plot_mode=1 draws, 0 erases. Never writes to $4000 video here.
+-; Clobbers AF/BC/DE/HL, preserves IX/IY.
+-stars_v13_apply_cache:
+- ld hl,stars_v13_cache        ; HL=start of 96-byte array (addr,addr,mask).
+- ld b,32                      ; Process exactly 32 points.
+-stars_v13_apply_loop:
+- push bc                       ; Preserve outer point count.
+- ld e,(hl)                    ; Read video address low.
+- inc hl                        ; Advance cache pointer.
+- ld d,(hl)                    ; Read video address high.
+- inc hl                        ; Advance to mask.
+- ld b,(hl)                    ; B=one-bit star mask.
+- inc hl                        ; Advance to next record.
+- push hl                       ; Save cache cursor.
+- ld a,d                        ; Convert $4000 video address to $C000 work.
+- add a,128                     ; +$8000 = work high byte.
+- ld d,a                        ; DE=correct work pixel-byte address.
+- ex de,hl                      ; HL=work address.
+- ld a,(plot_mode)              ; Select clear or draw.
+- or a                          ; Set Z for clear mode.
+- jp z,stars_v13_apply_clear   ; Branch to clear bit.
+- ld a,(hl)                    ; Read current composited byte.
+- or b                          ; Combine star with previous bits.
+- ld (hl),a                    ; Write composed work only.
+- jp stars_v13_apply_done      ; Avoid clear case.
+-stars_v13_apply_clear:
+- ; A moving star may cross a nonempty immutable planet or MOAI pixel.
+- ; Restore that ONE bit from $D800 sky instead of forcing it to black.
+- ld a,b                        ; Star one-bit mask.
+- xor 255                       ; Inverted mask clears this star from work.
+- and (hl)                      ; Preserve every unrelated work-buffer pixel.
+- ld (hl),a                     ; Write partially restored byte to work.
+- push hl                       ; Save $C000 composed address.
+- ld a,h                        ; High byte of work address.
+- add a,24                      ; $C000..$D7FF -> $D800..$EFFF immutable sky.
+- ld h,a                        ; HL now references true static source.
+- ld a,(hl)                     ; Read planet/MOAI background bits.
+- and b                         ; Isolate background bit under moving star.
+- pop hl                        ; HL back to work byte.
+- or (hl)                       ; Preserve immutable pixel even if star disappears.
+- ld (hl),a                     ; Final correct work byte.
+-stars_v13_apply_done:
+- pop hl                        ; Restore cache pointer.
+- pop bc                        ; Restore counter.
+- djnz stars_v13_apply_loop    ; Repeat for 32 stars.
+- ret                           ; Finished.
+-
+-stars_v13_apply_selected:
+- ld hl,(stars_v13_active_cache) ; Selected half's existing cached address bytes.
+- ld b,16                        ; Exactly 16 stars move this tick.
+- jp stars_v13_apply_loop       ; Reuse OR/AND bit operation for selected cache.
++; V1.1: stars_v13_apply_cache/apply_selected (modo OR/AND por variable) se
++; sustituyeron por los bucles especializados de borrado y dibujo.
+ 
+ stars_v13_draw_all:
+- ld a,1                        ; Drawing requires OR mode.
+- ld (plot_mode),a              ; Set 1=draw.
+- jp stars_v13_apply_cache     ; OR current cached stars into work.
++ ; V1.1: bucle OR especializado (sin modo ni PUSH/POP por estrella).
++ ld hl,stars_v13_cache
++ ld b,32
++stars_v11_draw_loop:
++ ld e,(hl)
++ inc hl
++ ld a,(hl)
++ add a,128
++ ld d,a                        ; DE = byte en la imagen de trabajo
++ inc hl
++ ld a,(de)
++ or (hl)                       ; Mascara de la estrella
++ ld (de),a
++ inc hl
++ djnz stars_v11_draw_loop
++ ret
+ 
+ ; Present old and new star bytes only AFTER final sprite composition.
+ ; Each writes a full finalized byte, never XORs or clears VRAM directly.
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' FINAL_1_0_1/src/title_screen.asm hal/src/title_screen.asm
+--- FINAL_1_0_1/src/title_screen.asm	2026-11-11 22:37:15.900140149 +0100
++++ V1_1/src/title_screen.asm	2026-11-11 23:16:40.632120360 +0100
+@@ -35,28 +35,24 @@
+ ; Wait until SPACE is released (fresh press requirement), then pressed.
+ ; ROM ISR remains active at 50 Hz, so HALT does not spin at full speed.
+ title_screen_wait:
++ call kempston_detect          ; V1.1: hay Kempston? (bus flotante = no)
+  ld a,75                     ; A leisurely attract-mode baseline hold, 1.5s PAL.
+  ld (title_pulse_countdown),a
+  xor a                       ; Phase zero: display original yellow title.
+  ld (title_pulse_phase),a
+  title_wait_release:
+  halt                          ; Yield to next display interrupt (50Hz PAL).
+- ld bc,0x7ffe                  ; B selects SPACE row, C selects ULA port FE.
+- in a,(c)                      ; A = keyboard row, active low bits.
+- and 1                         ; Only SPACE bit 0 matters.
++ call any_fire_pressed         ; V1.1: SPACE, 0 (Sinclair) o fuego Kempston.
+  jr z,title_wait_release       ; If key held at boot, require a release.
+ title_wait_press:
+  halt                          ; Wait for next display interrupt.
+  call title_pulse_tick         ; Attract mode: brief white pulse, original logo bitmap untouched.
+- ld bc,0x7ffe                  ; Select SPACE keyboard row again.
+- in a,(c)                      ; Read key state into A.
+- and 1                         ; Z means SPACE pressed.
++ call any_fire_pressed
+  jr nz,title_wait_press        ; Do not start while SPACE remains unpressed.
++ call title_choose_controls    ; V1.1: fuego del Kempston = partida con joystick.
+ title_wait_start_release:
+  halt                          ; Wait until the start key is released again.
+- ld bc,0x7ffe                  ; Select SPACE row; prevents an accidental first shot.
+- in a,(c)                      ; A = keyboard state, active low.
+- and 1                         ; Z while SPACE remains pressed.
++ call any_fire_pressed
+  jr z,title_wait_start_release ; Hold here until the key is physically released.
+  ret                           ; Start gameplay without reusing the start press as FIRE.
+ 
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' FINAL_1_0_1/src/v11_bajo.asm hal/src/v11_bajo.asm
+--- FINAL_1_0_1/src/v11_bajo.asm	1970-01-01 01:00:00.000000000 +0100
++++ V1_1/src/v11_bajo.asm	2026-11-11 23:56:52.243194257 +0100
+@@ -0,0 +1,296 @@
++; HALCONES ESTELARES 1.1 - RUTINAS FRIAS EN MEMORIA BAJA ($7E20..$7FFF).
++; Se cargan junto a los sprites reubicados. Solo JP/CALL hacia el bloque
++; principal (las direcciones las inyecta build.py). Codigo poco frecuente:
++; arranque, titulo, pausa, marcador, cartel de oleada y tablas.
++
++
++; Kempston solo si 256 lecturas seguidas tienen los bits 5..7 a cero y nunca
++; izquierda+derecha a la vez (sin interfaz el bus flotante da $FF).
++kempston_detect:
++ xor a
++ ld (kempston_ok),a
++ ld (kempston_mode),a
++ halt
++ ld b,0
++kd_loop:
++ in a,(0x1f)
++ ld c,a
++ and 0xe0
++ ret nz
++ ld a,c
++ and 3
++ cp 3
++ ret z
++ djnz kd_loop
++ ld a,1
++ ld (kempston_ok),a
++ ret
++
++; Z = algun fuego pulsado (SPACE, 0 de Sinclair o Kempston si existe).
++; Usado en titulo y GAME OVER. Destruye AF, BC.
++any_fire_pressed:
++ ld bc,0x7ffe
++ in a,(c)
++ and 1
++ ret z
++ ld b,0xef
++ in a,(c)
++ and 1
++ ret z
++ ld a,(kempston_ok)
++ or a
++ jr z,afp_none
++ in a,(0x1f)
++ and 0x10
++ jr z,afp_none
++ xor a
++ ret
++afp_none:
++ or 1
++ ret
++
++; Al empezar: se juega con Kempston solo si se pulso SU fuego en el titulo.
++title_choose_controls:
++ xor a
++ ld (kempston_mode),a
++ ld a,(kempston_ok)
++ or a
++ ret z
++ in a,(0x1f)
++ and 0x10
++ ret z
++ ld a,1
++ ld (kempston_mode),a
++ ret
++
++; H = pausa. Borde azul; el IM2 deja quietos escudo, invulnerabilidad y
++; reagrupamientos. Otra pulsacion de H continua.
++pause_check:
++ ld bc,0xbffe
++ in a,(c)
++ and 16
++ jr z,pc_down
++ xor a
++ ld (pause_held),a
++ ret
++pc_down:
++ ld a,(pause_held)
++ or a
++ ret nz
++ ld a,1
++ ld (pause_held),a
++ ld (game_paused),a
++ ld a,1
++ out (0xfe),a
++pc_wait_release:
++ halt
++ ld bc,0xbffe
++ in a,(c)
++ and 16
++ jr z,pc_wait_release
++pc_wait_press:
++ halt
++ ld bc,0xbffe
++ in a,(c)
++ and 16
++ jr nz,pc_wait_press
++ xor a
++ out (0xfe),a
++ ld (game_paused),a
++ ld (tick_irqs),a
++ ret
++
++; ---------------------------------------------------------------------------
++; MARCADOR DE 16 BITS Y VIDA EXTRA
++; score_words cuenta impactos (puntos/10) hasta 9999 = 99.990 puntos.
++; Cada 100 impactos (1.000 puntos) se gana una vida, si quedan menos de 3.
++score_add_kill:
++ ld a,(kills)               ; Byte historico (sin uso para el marcador).
++ inc a
++ ld (kills),a
++ ld hl,(score_words)
++ ld de,9999
++ or a
++ sbc hl,de
++ jr nc,sak_counted
++ add hl,de
++ inc hl
++ ld (score_words),hl
++sak_counted:
++ ld a,(life_next)
++ inc a
++ cp 100
++ jr c,sak_store
++ ld a,(player_lives)
++ or a
++ jr z,sak_reset             ; Ya sin vidas: no se resucita en la explosion final.
++ cp 3
++ jr nc,sak_reset
++ inc a
++ ld (player_lives),a        ; lives_hud_present dibuja la sonrisa nueva.
++ call beep_shield_ready
++ call beep_shield_ready
++sak_reset:
++ xor a
++sak_store:
++ ld (life_next),a
++ jp score_draw
++
++; score_words -> 4 cifras en score_digits. Destruye AF, BC, DE, HL.
++score_to_digits:
++ ld hl,(score_words)
++ ld de,1000
++ call sd_div
++ ld (score_digits),a
++ ld de,100
++ call sd_div
++ ld (score_digits+1),a
++ ld de,10
++ call sd_div
++ ld (score_digits+2),a
++ ld a,l
++ ld (score_digits+3),a
++ ret
++sd_div:
++ ld b,0
++sd_loop:
++ or a
++ sbc hl,de
++ jr c,sd_done
++ inc b
++ jr sd_loop
++sd_done:
++ add hl,de
++ ld a,b
++ ret
++
++; ---------------------------------------------------------------------------
++; CARTEL "OLEADA n" (1..6) ANTES DE CADA FORMACION
++; Se escribe en la imagen de trabajo (C000) y en pantalla, fila 11 (y=88..94),
++; columnas 9..16, en amarillo brillante. Al acabar se repone el cielo (D800).
++wave_card_start:
++ ld a,card_len
++ ld (card_ticks),a
++ ld a,(wave_stage)
++ add a,a
++ ld b,a
++ ld a,(wave_repeat)
++ add a,b
++ inc a
++ ld (card_wave),a
++ ld a,0x46
++ jp wave_card_attr
++
++wave_card_tick:
++ ld a,(card_ticks)
++ dec a
++ ld (card_ticks),a
++ jr z,wave_card_end
++ ret
++
++; Tras componer la imagen: redibuja el texto (estrellas y disparos lo pisan)
++; en trabajo y pantalla a la vez, asi ambas coinciden al acabar cada tick.
++card_draw:
++ ld a,(card_ticks)
++ or a
++ ret z
++ ld hl,card_glyphs
++ ld e,0x69                  ; Columna 9 de la fila de pixel 88.
++ ld c,7
++wct_loop:
++ ld a,(hl)
++ inc hl
++ push hl
++ ld h,(hl)
++ ld l,a
++ call card_glyph
++ pop hl
++ inc hl
++ dec c
++ jr nz,wct_loop
++ ld a,(card_wave)           ; La cifra sale de la fuente del marcador.
++ ld l,a
++ ld h,0
++ ld d,h
++ ld b,l
++ add hl,hl
++ add hl,hl
++ add hl,hl
++ ld a,l
++ sub b
++ ld l,a                     ; HL = cifra*7 (cabe en un byte)
++ ld bc,digit_bitmaps
++ add hl,bc
++ call card_glyph
++ ret
++
++wave_card_end:
++ ld hl,0xe069               ; Cielo inmutable de esas 7 filas -> trabajo y pantalla.
++ ld b,7
++wce_row:
++ push bc
++ push hl
++ ld b,8
++wce_col:
++ ld a,(hl)
++ ld e,a
++ ld a,h
++ sub 0x18
++ ld d,a                     ; D = fila en C000..
++ ld a,e
++ ld e,l
++ ld (de),a
++ res 7,d                    ; .. y en la pantalla (4000..)
++ ld (de),a
++ inc l
++ djnz wce_col
++ pop hl
++ inc h
++ pop bc
++ djnz wce_row
++ ld a,0x47
++ call wave_card_attr
++ jp wave_spawn_now
++
++; A = atributo para las 8 celdas del cartel. Se escribe en la sombra privada;
++; card_attr_present lo pasa a la pantalla despues del color de los sprites.
++wave_card_attr:
++ ld hl,0xf269
++ ld b,8
++wca_loop:
++ ld (hl),a
++ inc hl
++ djnz wca_loop
++ ret
++card_attr_present:
++ ld hl,0xf269
++ ld de,0x5969
++ ld bc,8
++ ldir
++ ret
++
++; HL = 7 bytes de la letra, E = byte bajo (0x60+columna). Conserva C y E.
++card_glyph:
++ ld d,0x48
++ ld b,7
++cg_row:
++ ld a,(hl)
++ ld (de),a
++ set 7,d
++ ld (de),a
++ res 7,d
++ inc hl
++ inc d
++ djnz cg_row
++ inc e
++ ret
++
++card_glyphs:
++ dw glyph_o,glyph_l,glyph_e,glyph_a,glyph_d,glyph_a,glyph_sp
++glyph_o: db 56,68,68,68,68,68,56
++glyph_l: db 64,64,64,64,64,64,124
++glyph_e: db 124,64,64,120,64,64,124
++glyph_a: db 56,68,68,124,68,68,68
++glyph_d: db 120,68,68,68,68,68,120
++glyph_sp: db 0,0,0,0,0,0,0
++
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' FINAL_1_0_1/src/v11_controles.asm hal/src/v11_controles.asm
+--- FINAL_1_0_1/src/v11_controles.asm	1970-01-01 01:00:00.000000000 +0100
++++ V1_1/src/v11_controles.asm	2026-11-11 23:56:52.243194257 +0100
+@@ -0,0 +1,123 @@
++; HALCONES ESTELARES 1.1 — CONTROLES, RITMO FIJO Y PAUSA
++; Variables de trabajo en $F001..$F0FF (libre, entre el testigo $F000 y los
++; atributos privados $F100). Se ponen a cero al arrancar (v11_boot_clear).
++input_bits equ 0xf010      ; bit0 dcha, 1 izda, 2 abajo, 3 arriba, 4 fuego (1=pulsado)
++kempston_ok equ 0xf011     ; 1 = hay interfaz Kempston (detectada en el titulo)
++kempston_mode equ 0xf012   ; 1 = la partida se juega con el joystick Kempston
++tick_irqs equ 0xf013       ; interrupciones desde el ultimo tick de juego
++game_paused equ 0xf014     ; 1 = pausa: el IM2 no avanza ningun temporizador
++pause_held equ 0xf015      ; flanco de la tecla H
++grace_irqs equ 0xf016      ; V1.1: invulnerabilidad extra tras reaparecer (IRQs)
++enemy_fire_cd equ 0xf017   ; V1.1: ticks hasta el proximo disparo enemigo
++card_ticks equ 0xf018      ; V1.1: ticks que quedan del cartel de oleada
++card_wave equ 0xf019       ; V1.1: numero de oleada (1..6) del cartel
++life_next equ 0xf01a       ; V1.1: millares de puntos para la proxima vida extra
++score_words equ 0xf020     ; V1.1: kills de 16 bits (puntos/10), tope 9999
++score_digits equ 0xf022    ; V1.1: millares, centenas, decenas, unidades
++boss_eye equ 0xf01b        ; V1.1: ojo del MOAI que dispara (alterna)
++card_len equ 40            ; cartel: 40 ticks = 1,6 s
++
++tick_frames equ 2          ; 2 interrupciones por tick = 25 ticks/s constantes
++
++; Lee teclado (O/P/A/Q/SPACE), Sinclair (6/7/8/9/0) y, si se eligio, Kempston.
++; Salida: input_bits. Destruye AF, BC, DE.
++input_poll:
++ ld d,0
++ ld bc,0xdffe              ; P (bit0) dcha, O (bit1) izda
++ in a,(c)
++ cpl
++ and 3
++ ld d,a
++ ld b,0xfd                 ; A = escudo (abajo)
++ in a,(c)
++ rra
++ jr c,ip_q
++ set 2,d
++ip_q:
++ ld b,0xfb                 ; Q = escudo (arriba)
++ in a,(c)
++ rra
++ jr c,ip_space
++ set 3,d
++ip_space:
++ ld b,0x7f                 ; SPACE = fuego
++ in a,(c)
++ rra
++ jr c,ip_sinclair
++ set 4,d
++ip_sinclair:
++ ld b,0xef                 ; 6 izda, 7 dcha, 8 abajo, 9 arriba, 0 fuego
++ in a,(c)
++ cpl
++ ld e,a
++ and 1
++ jr z,ip_s9
++ set 4,d
++ip_s9:
++ bit 1,e
++ jr z,ip_s8
++ set 3,d
++ip_s8:
++ bit 2,e
++ jr z,ip_s7
++ set 2,d
++ip_s7:
++ bit 3,e
++ jr z,ip_s6
++ set 0,d
++ip_s6:
++ bit 4,e
++ jr z,ip_kempston
++ set 1,d
++ip_kempston:
++ ld a,(kempston_mode)
++ or a
++ jr z,ip_store
++ in a,(0x1f)
++ and 0x1f
++ or d
++ ld d,a
++ip_store:
++ ld a,d
++ ld (input_bits),a
++ ret
++
++; Espera a que pasen tick_frames interrupciones desde el ultimo tick: el juego
++; avanza siempre a 25 ticks/s, ni mas rapido en escenas ligeras ni a saltos.
++tick_wait:
++ di
++ ld a,(tick_irqs)
++ cp tick_frames
++ jr nc,tick_go
++ ei
++ halt
++ jr tick_wait
++tick_go:
++ xor a
++ ld (tick_irqs),a
++ ei
++ ret
++
++; IM2 (guarda AF y HL el llamador).
++grace_irq_tick:
++ ld a,(grace_irqs)
++ or a
++ ret z
++ dec a
++ ld (grace_irqs),a
++ ret
++
++
++v11_boot_clear:
++ ld hl,0xf001
++ ld de,0xf002
++ ld bc,254
++ ld (hl),0
++ ldir
++ ret
++
++; Ticks (a 25/s) entre disparos enemigos: cuervos, cazadores, kamikazes, MOAI.
++; Fase 1 = la de siempre algo mas tranquila; despues se acelera poco a poco.
++fire_period_first: db 80,64,32,48
++fire_period_later: db 64,48,20,28
++
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' FINAL_1_0_1/tests/boot_v15.py hal/tests/boot_v15.py
+--- FINAL_1_0_1/tests/boot_v15.py	2026-11-11 22:37:15.900249846 +0100
++++ V1_1/tests/boot_v15.py	2026-11-11 23:36:40.482522647 +0100
+@@ -1,7 +1,7 @@
+ """Launch the real title flow in the headless Z80 VM (no fabricated state)."""
+ from mini_z80 import SYM
+ 
+-def boot_to_game(v):
++def boot_to_game(v,keep_card=False):
+     v.run_to(lambda q:q.pc==SYM['title_wait_release'],steps=1_000_000)
+     v.run_to(lambda q:q.pc==SYM['title_wait_press'],steps=10_000)
+     v.keys={'SPACE'}
+@@ -9,4 +9,10 @@
+     v.keys=set()
+     v.run_to(lambda q:q.pc==SYM['main_loop'],steps=900_000)
+     assert v.sp==0xfff0 and v.im==2 and v.ir==0xfe
++    if 'card_ticks' in SYM and not keep_card:
++        # V1.1: la partida empieza con el cartel OLEADA 1 y la formacion entra al
++        # acabarlo. Estas pruebas son de versiones sin cartel: se salta.
++        v.set('card_ticks',0);v.set('wave_done',0)
++        a=SYM['wave_initial'];v.m[SYM['enemy_slots']:SYM['enemy_slots']+36]=v.m[a:a+36]
++        for i in range(8):v.m[0xf269+i]=0x47
+     return v
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' FINAL_1_0_1/tests/emulador_completo/harness.py hal/tests/emulador_completo/harness.py
+--- FINAL_1_0_1/tests/emulador_completo/harness.py	2026-11-11 22:37:15.900539820 +0100
++++ V1_1/tests/emulador_completo/harness.py	2026-11-11 23:32:18.624045051 +0100
+@@ -9,6 +9,7 @@
+ KEYS = {  # tecla -> (fila de media linea, bit)
+     'SPACE': (0x7f, 0), 'O': (0xdf, 1), 'P': (0xdf, 0), 'A': (0xfd, 0), 'Q': (0xfb, 0),
+     'ENTER': (0xbf, 0), 'H': (0xbf, 4), '0': (0xef, 0),
++    '6': (0xef, 4), '7': (0xef, 3), '8': (0xef, 2), '9': (0xef, 1),
+ }
+ REGS = ['b', 'c', 'd', 'e', 'ix', 'iy', 'a_', 'f_', 'b_', 'c_', 'd_', 'e_', 'h_', 'l_']
+ 
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' FINAL_1_0_1/tests/mini_z80.py hal/tests/mini_z80.py
+--- FINAL_1_0_1/tests/mini_z80.py	2026-11-11 22:37:15.900274740 +0100
++++ V1_1/tests/mini_z80.py	2026-11-12 00:01:16.338468055 +0100
+@@ -12,6 +12,8 @@
+   self.m=bytearray(65536);binary=(ROOT/'build/starter.bin').read_bytes();self.m[32768:32768+len(binary)]=binary
+   low=(ROOT/'build/sprites_reloc_v22.bin')
+   if low.exists():self.m[0x6000:0x6000+low.stat().st_size]=low.read_bytes()
++  low11=(ROOT/'build/v11_bajo.bin')  # V1.1: rutinas frias tras los sprites
++  if low11.exists() and low.exists():a=0x6000+low.stat().st_size;self.m[a:a+low11.stat().st_size]=low11.read_bytes()
+   extra=(ROOT/'build/moai_bitmap_v19.bin')
+   if extra.exists():self.m[0xf401:0xf401+extra.stat().st_size]=extra.read_bytes()
+   jupiter=(ROOT/'build/jupiter_bitmap_v20.bin')
+@@ -53,8 +55,8 @@
+   v=self.m[self.sp]|self.m[(self.sp+1)&65535]<<8;self.sp=(self.sp+2)&65535;return v
+  def flags(self,v,carry=0):self.f=(0x40 if (v&255)==0 else 0) | (1 if carry else 0)
+  def cond(self,idx):
+-  z=bool(self.f&0x40);c=bool(self.f&1)
+-  return [not z,z,not c,c,False,False,False,False][idx]
++  z=bool(self.f&0x40);c=bool(self.f&1);pv=bool(self.f&4);sg=bool(self.f&0x80)
++  return [not z,z,not c,c,not pv,pv,not sg,sg][idx]  # V1.1: PO/PE/P/M reales
+  def alu(self,which,v):
+   a=self.r[7]
+   if which==0:res=a+v;self.flags(res,res>255);self.r[7]=res&255
+@@ -75,11 +77,19 @@
+   return v
+  def signed(self,v):return v-256 if v&128 else v
+  def step(self):
++  # V1.1: este interprete no lleva reloj IM2; cada tick de juego recibe aqui
++  # las 2 interrupciones que tick_wait espera (25 ticks/s en el Spectrum).
++  if self.pc==SYM.get('tick_wait',-1):self.m[SYM['tick_irqs']]=2
+   at=self.pc;op=self.rd();self.steps+=1
+   if op in (0x00,0x76,0xf3,0xfb):return
+   if op==0xc9:self.pc=self.pop();return
+   if op==0xeb:
+    d=self.r16(1);self.set16(1,self.hl());self.sethl(d);return
++  if op==0x2f:self.r[7]^=0xff;return  # V1.1: CPL
++  if op==0x37:self.f|=1;return  # V1.1: SCF
++  if op==0x3f:self.f^=1;return  # V1.1: CCF
++  if op==0x1f:  # V1.1: RRA
++   a=self.r[7];self.r[7]=(a>>1)|((self.f&1)<<7);self.f=(self.f&0xfe)|(a&1);return
+   if op in (0x0f,0x07):
+    a=self.r[7];self.r[7]=((a>>1)|(a<<7))&255 if op==0xf else ((a<<1)|(a>>7))&255
+    self.f=(self.f&0x40)|(a&1 if op==0xf else a>>7);return
+@@ -138,10 +148,16 @@
+    if which is None or self.cond(which):self.pc=(self.pc+j)&65535
+    return
+   if op==0xd3:self.rd();self.port_writes+=1;return
++  if op==0xdb:self.rd();self.r[7]=0xff;return  # V1.1: IN A,(n) - sin Kempston (bus flotante)
++  if op==0x08:  # V1.1: EX AF,AF'
++   a2=getattr(self,'af2',(0,0));self.af2=(self.r[7],self.f);self.r[7],self.f=a2;return
+   if op==0xed:
+    x=self.rd()
+    if x==0x78:self.r[7]=self.portread();return
+    if x==0x47:self.ir=self.r[7];return # LD I,A (real Z80)
++   if x in (0x42,0x52):  # V1.1: SBC HL,BC / SBC HL,DE
++    v=self.r16(0 if x==0x42 else 1);res=self.hl()-v-(self.f&1);self.set16(2,res&65535)
++    self.f=(1 if res<0 else 0)|(0x40 if res&65535==0 else 0)|(0x80 if res&0x8000 else 0)|2;return
+    if x==0x5e:self.im=2;return     # IM 2 (real Z80)
+    if x==0x4d:self.pc=self.pop();return # RETI (real Z80)
+    if x in (0x4b,0x5b,0x6b,0x7b):
+@@ -169,6 +185,8 @@
+    x=self.rd();r=x&7
+    if 0x40<=x<0x80:
+     v=self.reg(r);b=(x>>3)&7;self.f=(self.f&1)|(0x40 if (v&(1<<b))==0 else 0);return
++   if x>=0x80:  # V1.1: RES / SET b,r
++    b=(x>>3)&7;v=self.reg(r);v=(v|(1<<b)) if x>=0xc0 else (v&~(1<<b));self.setreg(r,v&255);return
+    raise RuntimeError(f'unknown CB {x:02x} at {at:04x}')
+   if op in (0xdd,0xfd):
+    x=self.rd();prefix='ix' if op==0xdd else 'iy';idx=getattr(self,prefix)
+@@ -185,6 +203,7 @@
+    if x==0x35:self.m[addr]=(self.m[addr]-1)&255;return
+    if 0x46<=x<=0x7e and x&7==6:self.r[(x>>3)&7]=self.m[addr];return
+    if 0x70<=x<=0x77:self.m[addr]=self.reg(x&7);return
++   if x&0xc7==0x86:self.alu((x>>3)&7,self.m[addr]);return  # V1.1: ADD/SUB/AND/XOR/OR/CP (IX/IY+d)
+    raise RuntimeError(f'unknown {prefix} {x:02x} at {at:04x}')
+   raise RuntimeError(f'unknown opcode {op:02x} @ {at:04x} after {self.steps} steps')
+  def run_to(self,check,steps=1_000_000):
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' FINAL_1_0_1/tests/test_v11_controles.py hal/tests/test_v11_controles.py
+--- FINAL_1_0_1/tests/test_v11_controles.py	1970-01-01 01:00:00.000000000 +0100
++++ V1_1/tests/test_v11_controles.py	2026-11-11 23:32:18.639850892 +0100
+@@ -0,0 +1,113 @@
++#!/usr/bin/env python3
++"""HALCONES ESTELARES 1.1 - controles, ritmo fijo y pausa (emulador Z80 completo).
++1. Sin Kempston (bus flotante $FF): se empieza con SPACE y el puerto $1F no se
++   vuelve a leer durante la partida.
++2. Con Kempston: empezar con SU fuego = partida con joystick (izquierda, derecha,
++   fuego y escudo con arriba/abajo).
++3. Con Kempston conectado pero empezando con SPACE: se juega con teclado.
++4. Sinclair (6/7/8/9/0) funciona siempre.
++5. H pausa: el escudo activo no se gasta en pausa; otra H continua.
++6. El juego avanza a 25 ticks/s fijos (2 interrupciones por tick)."""
++import sys,json
++from pathlib import Path
++R=Path(__file__).resolve().parents[1]
++sys.path.insert(0,str(R/'tests'/'emulador_completo'))
++import harness
++from harness import Speccy
++TAP=str(R/'build'/'HALCONES_ESTELARES_V281.tap')
++S=json.load(open(R/'build'/'starter.sym.json'))
++
++def boot(kempston=0xff,start='SPACE'):
++    s=Speccy(tap=TAP,watch=False);s.kempston=kempston;z=s.z;m=z.m
++    reads=[0];op=s.port_in
++    def pin(port):
++        if port&0xff==0x1f:reads[0]+=1
++        return op(port)
++    z.port_in=pin
++    for f in range(400):
++        if m[S['tick_irqs']] and z.pc>=S['combat_tick']-0x2000 and S['main_loop']<=z.pc<0xc000 and f>100:break
++        press=90<=f<96
++        if start=='KEMPSTON':
++            s.kempston=(kempston|0x10) if press else kempston
++            s.frame(())
++        else:
++            s.frame({start} if press else ())
++    # esperar a estar dentro de la partida
++    for f in range(200):
++        s.frame(())
++        if m[S['card_ticks']]:break
++    assert m[S['card_ticks']],'la partida no empezo'
++    return s,reads
++
++def ship_after(s,keys=(),kemp=None,frames=20):
++    m=s.z.m;x0=m[S['ship_x']]
++    for f in range(frames):
++        if kemp is not None:s.kempston=kemp
++        s.frame(keys)
++    return m[S['ship_x']]-x0
++
++def test_sin_kempston():
++    s,reads=boot(0xff,'SPACE');m=s.z.m
++    assert m[S['kempston_ok']]==0 and m[S['kempston_mode']]==0
++    r0=reads[0]
++    assert ship_after(s,{'O'})<0 and ship_after(s,{'P'})>0
++    assert reads[0]==r0,'sin Kempston no se debe leer el puerto 1F en partida'
++
++def test_kempston():
++    s,reads=boot(0x00,'KEMPSTON');m=s.z.m
++    assert m[S['kempston_ok']]==1 and m[S['kempston_mode']]==1
++    assert ship_after(s,(),kemp=0x02)<0,'Kempston izquierda'
++    assert ship_after(s,(),kemp=0x01)>0,'Kempston derecha'
++    # fuego: aparece un disparo del jugador
++    for f in range(30):s.kempston=0x10 if f%6<3 else 0;s.frame(())
++    assert any(m[S['bullet_slots']+3*i+2] for i in range(9)) or m[S['kills']] ,'Kempston fuego'
++    # escudo con arriba
++    s.kempston=0x08
++    for f in range(4):s.frame(())
++    s.kempston=0
++    assert m[S['shield_state']]==1,'Kempston arriba = escudo'
++
++def test_kempston_pero_teclado():
++    s,reads=boot(0x00,'SPACE');m=s.z.m
++    assert m[S['kempston_ok']]==1 and m[S['kempston_mode']]==0
++    r0=reads[0]
++    assert ship_after(s,(),kemp=0x02)==0,'empezando con SPACE el joystick no cuenta'
++    assert ship_after(s,{'O'})<0
++    assert reads[0]==r0
++
++def test_sinclair_y_pausa():
++    s,reads=boot(0xff,'0');m=s.z.m
++    assert ship_after(s,{'6'})<0 and ship_after(s,{'7'})>0,'Sinclair 6/7'
++    for f in range(4):s.frame({'9'})
++    assert m[S['shield_state']]==1,'Sinclair 9 = escudo'
++    t0=m[S['shield_timer']]|m[S['shield_timer']+1]<<8
++    for f in range(4):s.frame({'H'})
++    for f in range(100):s.frame(())
++    t1=m[S['shield_timer']]|m[S['shield_timer']+1]<<8
++    assert m[S['game_paused']]==1 and s.border==1,'H pausa con borde azul'
++    assert t1>=t0-6,('el escudo no debe gastarse en pausa',t0,t1)
++    for f in range(4):s.frame({'H'})
++    for f in range(10):s.frame(())
++    assert m[S['game_paused']]==0 and s.border==0,'H continua'
++
++def test_ritmo_fijo():
++    s,reads=boot(0xff,'SPACE');m=s.z.m;z=s.z
++    ticks=[];tick=S['combat_tick'];last=[None]
++    for f in range(300):
++        end=z.t+harness.FRAME
++        s.keys=set()
++        while z.t<end:
++            if z.pc==tick:ticks.append(s.frames)
++            z.step()
++        s.frames+=1
++        if z.iff1 and not z.ei_delay:
++            pc0,sp0=((z.pc+1)&0xffff if z.halted else z.pc),z.sp
++            if z.interrupt():
++                while not(z.pc==pc0 and z.sp==sp0):z.step()
++    gaps=[b-a for a,b in zip(ticks,ticks[1:])]
++    assert gaps.count(2)>=len(gaps)*0.97 and min(gaps)>=2,('25 ticks/s fijos',sorted(set(gaps)))
++
++if __name__=='__main__':
++    for t in (test_sin_kempston,test_kempston,test_kempston_pero_teclado,test_sinclair_y_pausa,test_ritmo_fijo):
++        t();print('PASS',t.__name__,flush=True)
++    print('PASS V1.1 controles: teclado, Sinclair, Kempston automatico, pausa H, 25 ticks/s')
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' FINAL_1_0_1/tests/test_v11_justicia.py hal/tests/test_v11_justicia.py
+--- FINAL_1_0_1/tests/test_v11_justicia.py	1970-01-01 01:00:00.000000000 +0100
++++ V1_1/tests/test_v11_justicia.py	2026-11-11 23:59:31.962965715 +0100
+@@ -0,0 +1,158 @@
++#!/usr/bin/env python3
++"""HALCONES ESTELARES 1.1 - juego mas justo, oleadas y marcador (emulador completo).
++1. Caja de impacto con la silueta: un disparo que pasa por la punta del ala a la
++   altura del morro ya no mata; uno en el morro o en el ala, si.
++2. Ningun disparo enemigo nace a menos de 43 px del morro.
++3. Al reaparecer: sin disparos enemigos en el aire y 2 s de invulnerabilidad.
++4. Marcador de 16 bits: pasa de 2.550 puntos sin volver a 0; vida extra cada
++   1.000 puntos (maximo 3 vidas).
++5. Cartel OLEADA n antes de cada formacion, numerado 1..6, y luego la formacion.
++6. Cadencia de disparo enemigo en tiempo real (ticks de 25/s)."""
++import sys,json
++from pathlib import Path
++R=Path(__file__).resolve().parents[1]
++sys.path.insert(0,str(R/'tests'/'emulador_completo'))
++import harness
++from harness import Speccy
++TAP=str(R/'build'/'HALCONES_ESTELARES_V281.tap')
++S=json.load(open(R/'build'/'starter.sym.json'))
++
++def in_game():
++    s=Speccy(tap=TAP,watch=False);m=s.z.m
++    for f in range(300):
++        s.frame({'SPACE'} if 90<=f<96 else ())
++        if f>100 and m[S['card_ticks']]:break
++    assert m[S['card_ticks']],'no empezo la partida'
++    return s
++
++def until_tick(s,label='combat_tick'):
++    z=s.z
++    for _ in range(2_000_000):
++        if z.pc==S[label]:return
++        z.step()
++    raise AssertionError('no llego a '+label)
++
++def call(s,label):
++    """Ejecuta una rutina real con el SP del juego y vuelve."""
++    z=s.z;m=z.m;ret=0x5f00;sp=z.sp
++    z.sp-=2;m[z.sp]=ret&255;m[z.sp+1]=ret>>8;z.pc=S[label]
++    for _ in range(500_000):
++        if z.pc==ret and z.sp==sp:return
++        z.step()
++    raise AssertionError('no volvio '+label)
++
++def test_caja_de_impacto():
++    s=in_game();m=s.z.m;z=s.z
++    pc,sp=z.pc,z.sp
++    sx,sy=80,152
++    cases=[(sx+0,sy-2,False,'ala izquierda a la altura del morro'),
++           (sx+20,sy+2,False,'ala derecha a la altura del morro'),
++           (sx+10,sy-2,True,'morro'),
++           (sx+2,sy+14,True,'ala, abajo'),
++           (sx+22,sy+14,False,'punta exterior del ala'),
++           (sx+10,sy+30,False,'por debajo de la nave')]
++    for bx,by,hit,what in cases:
++        m[S['ship_x']]=sx;m[S['ship_y']]=sy;m[S['player_lives']]=3
++        m[S['shield_invulnerable']]=0;m[S['grace_irqs']]=0;m[S['shield_state']]=0
++        b=S['enemy_bullet_slots'];m[b:b+9]=bytes(9);m[b]=bx;m[b+1]=by-5;m[b+2]=1
++        m[S['enemy_fire_cd']]=200
++        call(s,'enemy_bullet_update')
++        died=m[S['player_lives']]==2
++        assert died==hit,(what,bx,by,died)
++    z.pc,z.sp=pc,sp
++
++def test_disparo_esquivable():
++    s=in_game();m=s.z.m;z=s.z
++    pc,sp=z.pc,z.sp
++    for ey in (60,80,93,94,100,130):
++        e=S['enemy_slots'];m[e:e+36]=bytes(36);m[e:e+6]=bytes([80,ey,1,0,80,0])
++        b=S['enemy_bullet_slots'];m[b:b+9]=bytes(9)
++        m[S['enemy_fire_cd']]=0;m[S['wave_stage']]=0;m[S['wave_cycle']]=0;m[S['shot_spawn_turn']]=5
++        call(s,'enemy_bullet_update')
++        spawned=m[b+2]==1
++        assert spawned==(ey+15<=108),(ey,spawned)
++        if spawned:assert m[b+1]<=108
++    z.pc,z.sp=pc,sp
++
++def test_reaparicion():
++    s=in_game();m=s.z.m
++    for _ in range(60):s.frame(())          # cartel fuera, formacion dentro
++    m[S['grace_irqs']]=0;m[S['shield_invulnerable']]=0;m[S['shield_state']]=0
++    # muerte real por un disparo en el morro
++    b=S['enemy_bullet_slots'];m[b:b+3]=bytes([m[S['ship_x']]+10,m[S['ship_y']]-6,1])
++    lives=m[S['player_lives']]
++    for f in range(8):
++        s.frame(())
++        if m[S['player_lives']]<lives:break
++    assert m[S['player_lives']]==lives-1,'el disparo en el morro debia matar'
++    # disparos enemigos en el aire justo antes de reaparecer
++    seen=False
++    for f in range(140):
++        if m[S['shield_invulnerable']]>52:
++            for i in range(3):m[b+3*i:b+3*i+3]=bytes([60+20*i,100,1])
++        s.frame(())
++        if m[S['player_respawn_pending']]==0 and m[S['grace_irqs']]>0 and not seen:
++            seen=True
++            assert not any(m[b+3*i+2] for i in range(3)),'quedaron disparos enemigos al reaparecer'
++            assert m[S['grace_irqs']]>=95
++    assert seen,'no reaparecio'
++    # durante la gracia los choques no quitan vida
++    lives=m[S['player_lives']]
++    m[b:b+3]=bytes([m[S['ship_x']]+10,m[S['ship_y']]-6,1])
++    for f in range(6):s.frame(())
++    assert m[S['player_lives']]==lives,'la gracia debe proteger'
++
++def test_marcador_y_vida_extra():
++    s=in_game();m=s.z.m;z=s.z
++    pc,sp=z.pc,z.sp
++    w=S['score_words']
++    m[w]=255;m[w+1]=0;m[S['kills']]=255;m[S['life_next']]=0
++    call(s,'score_add_kill')
++    assert m[w]|m[w+1]<<8==256,'el marcador de 16 bits no debe volver a 0'
++    d=S['score_digits'];assert list(m[d:d+4])==[0,2,5,6]
++    m[w]=9999&255;m[w+1]=9999>>8
++    call(s,'score_add_kill');assert m[w]|m[w+1]<<8==9999,'tope 99.990'
++    m[S['player_lives']]=2;m[S['life_next']]=99
++    call(s,'score_add_kill');assert m[S['player_lives']]==3 and m[S['life_next']]==0,'vida extra a los 1.000'
++    m[S['life_next']]=99
++    call(s,'score_add_kill');assert m[S['player_lives']]==3,'como mucho 3 vidas'
++    z.pc,z.sp=pc,sp
++
++def test_carteles():
++    s=in_game();m=s.z.m
++    assert m[S['card_wave']]==1 and not any(m[S['enemy_slots']+6*i+2] for i in range(6))
++    s.screen(str(R/'build'/'V11_CARTEL_OLEADA_1.png'))
++    for f in range(100):
++        s.frame(())
++        if m[S['card_ticks']]==0:break
++    assert any(m[S['enemy_slots']+6*i+2] for i in range(6)),'tras el cartel entra la formacion'
++    seq=[]
++    for k in range(5):
++        for i in range(6):m[S['enemy_slots']+6*i+2]=0
++        for f in range(12):
++            s.frame(())
++            if m[S['card_ticks']]:break
++        seq.append(m[S['card_wave']])
++        for f in range(100):
++            s.frame(())
++            if m[S['card_ticks']]==0:break
++    assert seq==[2,3,4,5,6],seq
++
++def test_cadencia():
++    s=in_game();m=s.z.m;z=s.z
++    pc,sp=z.pc,z.sp
++    for stage,cycle,period in ((0,0,80),(1,0,64),(2,0,32),(2,1,20),(2,4,11),(0,2,61)):
++        m[S['wave_stage']]=stage;m[S['wave_cycle']]=cycle;m[S['enemy_fire_cd']]=0
++        e=S['enemy_slots'];m[e:e+36]=bytes(36);m[e:e+6]=bytes([80,20,1,0,80,0])
++        shots=[]
++        for t in range(period*2+4):
++            b=S['enemy_bullet_slots'];m[b:b+9]=bytes(9)
++            call(s,'enemy_bullet_update')
++            if m[b+2]:shots.append(t)
++        assert shots[:3]==[0,period+1,2*(period+1)],(stage,cycle,period,shots)
++    z.pc,z.sp=pc,sp
++
++if __name__=='__main__':
++    for t in (test_caja_de_impacto,test_disparo_esquivable,test_reaparicion,test_marcador_y_vida_extra,test_carteles,test_cadencia):
++        t();print('PASS',t.__name__,flush=True)
++    print('PASS V1.1 justicia: silueta, disparos esquivables, reaparicion limpia, marcador 16 bits + vida extra, carteles, cadencia en tiempo real')
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' FINAL_1_0_1/tests/test_v18_arcade.py hal/tests/test_v18_arcade.py
+--- FINAL_1_0_1/tests/test_v18_arcade.py	2026-11-11 22:37:15.900306708 +0100
++++ V1_1/tests/test_v18_arcade.py	2026-11-11 23:37:03.016923247 +0100
+@@ -51,7 +51,9 @@
+ v.render(R/'build/V18_ESCUDO_REAL_Z80.png',scale=3)
+ # Quit shield and stop recharging to force a legal unprotected collision.
+ v.set('shield_state',0);v.set('shield_key_held',0)
+-a=SYM['enemy_slots'];phase=(v.val('frame_index')+1)&63;offset=v.m[SYM['wave_sinus']+phase];v.m[a:a+6]=bytes([v.val('ship_x')+2,144,1,0,(v.val('ship_x')-offset)&255,0]);life=v.val('player_lives')
++# V1.1: la caja de choque es la silueta (no 24x24): el pajaro se coloca con la
++# formula real del vuelo en formacion (fase = (frame_index+1)>>2) para que toque.
++a=SYM['enemy_slots'];phase=((v.val('frame_index')+1)>>2)&63;offset=v.m[SYM['wave_sinus']+phase];v.m[a:a+6]=bytes([v.val('ship_x')+2,144,1,0,(v.val('ship_x')+2-offset)&255,0]);life=v.val('player_lives')
+ tick();assert v.val('player_lives')==life-1, (life,v.val('player_lives'))
+ assert v.val('lives_displayed')==v.val('player_lives')
+ assert v.val('ship_y')==152
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' FINAL_1_0_1/tests/test_v26_regroup_led_moai.py hal/tests/test_v26_regroup_led_moai.py
+--- FINAL_1_0_1/tests/test_v26_regroup_led_moai.py	2026-11-11 22:37:15.900330597 +0100
++++ V1_1/tests/test_v26_regroup_led_moai.py	2026-11-11 23:35:38.290227421 +0100
+@@ -79,7 +79,7 @@
+ v=boot_to_game(VM())
+ for expected in [(0,1),(1,0),(1,1),(2,0),(2,1),(3,0)]:
+     for i in range(6):v.m[SYM['enemy_slots']+6*i+2]=0
+-    v.set('wave_done',1);tick(v)
++    v.set('wave_done',1);v.set('card_ticks',0);tick(v)  # V1.1: sin cartel
+     assert (v.val('wave_stage'),v.val('wave_repeat'))==expected
+ assert v.val('boss_hp')==18
+ for yy in range(11):
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' FINAL_1_0_1/tests/test_v27_full_phase.py hal/tests/test_v27_full_phase.py
+--- FINAL_1_0_1/tests/test_v27_full_phase.py	2026-11-11 22:37:15.900349415 +0100
++++ V1_1/tests/test_v27_full_phase.py	2026-11-11 23:35:38.290634193 +0100
+@@ -32,7 +32,7 @@
+ assert v.val('phase_number')==1 and v.val('wave_stage')==0 and v.val('wave_repeat')==0
+ for expected_stage,expected_repeat in [(0,1),(1,0),(1,1),(2,0),(2,1),(3,0)]:
+     zero_wave(v)
+-    v.set('wave_done',1)
++    v.set('wave_done',1);v.set('card_ticks',0)  # V1.1: sin cartel
+     tick(v)
+     assert (v.val('wave_stage'),v.val('wave_repeat'))==(expected_stage,expected_repeat),(
+         'wrong progression',expected_stage,expected_repeat,v.val('wave_stage'),v.val('wave_repeat'))
+@@ -92,7 +92,7 @@
+ # Force victory (after 18 genuine hits have been verified in v2.0 regressions).
+ v=boot_to_game(VM())
+ for expect in [(0,1),(1,0),(1,1),(2,0),(2,1),(3,0)]:
+-    zero_wave(v);v.set('wave_done',1);tick(v)
++    zero_wave(v);v.set('wave_done',1);v.set('card_ticks',0);tick(v)  # V1.1: sin cartel
+ assert v.val('wave_stage')==3
+ v.set('kills',37)  # Score must survive the phase screen / HUD rebuild.
+ v.set('boss_hp',0);v.set('boss_death_left',0)
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' FINAL_1_0_1/tests/test_v27_led_jupiter.py hal/tests/test_v27_led_jupiter.py
+--- FINAL_1_0_1/tests/test_v27_led_jupiter.py	2026-11-11 22:37:15.900363283 +0100
++++ V1_1/tests/test_v27_led_jupiter.py	2026-11-11 23:35:38.290458842 +0100
+@@ -25,7 +25,7 @@
+ def enter_boss(v):
+     for stage,repeat in [(0,1),(1,0),(1,1),(2,0),(2,1),(3,0)]:
+         for i in range(6):v.m[SYM['enemy_slots']+6*i+2]=0
+-        v.set('wave_done',1);tick(v)
++        v.set('wave_done',1);v.set('card_ticks',0);tick(v)  # V1.1: sin cartel
+         assert (v.val('wave_stage'),v.val('wave_repeat'))==(stage,repeat)
+     assert v.val('boss_hp')==18
+ 
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' FINAL_1_0_1/tests/test_v283_moai_shield.py hal/tests/test_v283_moai_shield.py
+--- FINAL_1_0_1/tests/test_v283_moai_shield.py	2026-11-11 22:37:15.900405083 +0100
++++ V1_1/tests/test_v283_moai_shield.py	2026-11-11 23:37:34.379148381 +0100
+@@ -17,38 +17,36 @@
+     v.run_to(lambda q:q.pc==ret and q.sp==sp,steps=maxsteps)
+     assert v.sp==sp,(label,'stack imbalanced')
+ 
+-# MOAI: phase 01 fires only once per 32 frame_index increments; later MOAI original /16.
+-# Eye selection MUST use bit 5 at 32-frame cadence, bit 4 at 16-frame cadence.
+-def boss_shot(cycle,frame):
++# V1.1 (sustituye la regla V2.8.3 por frame_index): el MOAI dispara con un
++# temporizador en ticks de 25/s -48 ticks en la fase 01, 28 en la siguiente y
++# 3 menos por cada MOAI mas- y los ojos se alternan SIEMPRE, uno y otro.
++def boss_volley(cycle,ticks):
+     v=VM();v.sp=0xfff0
+-    v.set('wave_stage',3)
+-    v.set('wave_cycle',cycle)
+-    v.set('frame_index',frame)
+-    v.set('boss_hp',18)
+-    slots=SYM['enemy_bullet_slots'];v.m[slots:slots+9]=bytes(9)
+-    invoke(v,'enemy_bullet_update')
+-    active=v.m[slots+2]
+-    return (active,v.m[slots],v.m[slots+1])
+-for frame,expect in ((0,85),(16,None),(32,109),(48,None),(64,85),(96,109),(128,85),(160,109),(192,85),(224,109)):
+-    active,x,y=boss_shot(0,frame)
+-    assert bool(active)==(expect is not None),(frame,active,x,expect)
+-    if expect is not None:assert (x,y)==(expect,48),(frame,x,y,expect)
+-for cycle in (1,2,4):
+-    for frame,expect in ((0,85),(16,109),(32,85),(48,109),(64,85),(80,109)):
+-        active,x,y=boss_shot(cycle,frame)
+-        assert active and (x,y)==(expect,48),(cycle,frame,x,y,expect)
++    v.set('wave_stage',3);v.set('wave_cycle',cycle);v.set('boss_hp',18)
++    v.set('enemy_fire_cd',0);v.set('boss_eye',0)
++    slots=SYM['enemy_bullet_slots'];shots=[]
++    for t in range(ticks):
++        v.m[slots:slots+9]=bytes(9)
++        invoke(v,'enemy_bullet_update')
++        if v.m[slots+2]:shots.append((t,v.m[slots],v.m[slots+1]))
++    return shots
++for cycle,period in ((0,48),(1,28),(2,25),(4,19)):
++    shots=boss_volley(cycle,period*4+3)
++    assert [t for t,x,y in shots]==[0,period+1,2*(period+1),3*(period+1),4*(period+1)][:len(shots)] and len(shots)>=4,(cycle,shots)
++    assert [x for t,x,y in shots]==[109,85,109,85,109][:len(shots)] and all(y==48 for t,x,y in shots),(cycle,shots)
+ for cycle in (0,1):
+     v=VM();v.sp=0xfff0;v.set('wave_stage',3);v.set('wave_cycle',cycle)
+-    v.set('boss_hp',0);v.set('frame_index',0)
++    v.set('boss_hp',0);v.set('enemy_fire_cd',0)
+     slots=SYM['enemy_bullet_slots'];v.m[slots:slots+9]=bytes(9)
+     invoke(v,'enemy_bullet_update')
+     assert not any(v.m[slots+i*3+2] for i in range(3))
+-print('PASS assembled Z80 first MOAI shots /32 and alternating eyes; later bosses /16 unchanged; no defeated boss shots')
++print('PASS V1.1 MOAI: cadencia en tiempo real (48/28/25/19 ticks), ojos alternos, sin disparos tras su derrota')
+ 
+ # Full exact 50Hz countdown, including active, 38/37 eight segments, state READY.
+ from boot_v15 import boot_to_game
+ v=boot_to_game(VM());assert v.val('shield_state')==0 and v.val('shield_meter')==8
+ v.keys={'A'}
++invoke(v,'input_poll',maxsteps=30_000)   # V1.1: los mandos se leen una vez por tick
+ invoke(v,'shield_try_activate',maxsteps=30_000)
+ assert v.val('shield_state')==1 and v.val('shield_meter')==0
+ assert v.m[SYM['shield_timer']:SYM['shield_timer']+2]==bytes([150,0])
+@@ -74,7 +72,7 @@
+     assert v.m[SYM['shield_timer']:SYM['shield_timer']+2] == bytes([rem&255, rem>>8]),(t,'timer')
+ assert v.val('shield_ready_pending')==1
+ assert v.val('shield_meter')==8
+-v.keys=set();invoke(v,'shield_try_activate');v.keys={'A'};invoke(v,'shield_try_activate')
++v.keys=set();invoke(v,'input_poll');invoke(v,'shield_try_activate');v.keys={'A'};invoke(v,'input_poll');invoke(v,'shield_try_activate')  # V1.1
+ assert v.val('shield_state')==1 and v.val('shield_meter')==0
+ print('PASS actual IM2, full 150 active IRQ + 300 recharge IRQ: 38/37*4 -> exactly eight original stages, reg/SP unchanged, subsequent activation')
+ 
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' FINAL_1_0_1/tools/tap_writer.py hal/tools/tap_writer.py
+--- FINAL_1_0_1/tools/tap_writer.py	2026-11-11 22:37:15.900959567 +0100
++++ V1_1/tools/tap_writer.py	2026-11-11 23:56:45.425221563 +0100
+@@ -15,8 +15,9 @@
+ 
+ def create_tap(code,name,out,origin=32768,extra_code=None,extra_origin=0xf401,low_code=None,low_origin=0x6000):
+     assert origin==32768 and len(code)<32768
+-    # CLEAR VAL "32767": LOAD "" CODE: RANDOMIZE USR VAL "32768"
+-    prog=(basic_line(10,b'\xfd \xb0 "32767"')+
++    # V1.1: CLEAR VAL "24575" (RAMTOP $5FFF): los bloques de $6000 y $8000 quedan
++    # por encima de RAMTOP y la pila de la ROM no se pisa al cargar hasta $7FFF.
++    prog=(basic_line(10,b'\xfd \xb0 "24575"')+
+           basic_line(20,b'\xef "" \xaf')+
+           (basic_line(22,b'\xef "" \xaf') if low_code else b'')+
+           (basic_line(25,b'\xef "" \xaf') if extra_code else b'')+
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' FINAL_1_0_1/tools/z80_assembler.py hal/tools/z80_assembler.py
+--- FINAL_1_0_1/tools/z80_assembler.py	2026-11-11 22:37:15.900974008 +0100
++++ V1_1/tools/z80_assembler.py	2026-11-11 23:19:17.479714429 +0100
+@@ -86,6 +86,7 @@
+   if op=='ldir':self.emit(0xed,0xb0);return
+   if op=='lddr':self.emit(0xed,0xb8);return
+   if op=='neg':self.emit(0xed,0x44);return
++  if op=='sbc' and args[0]=='hl' and args[1] in RR:self.emit(0xed,0x42+16*RR[args[1]]);return
+   if op=='ex':
+    if args==['de','hl']:self.emit(0xeb);return
+    if args==["af","af'"]:self.emit(0x08);return
+@@ -154,6 +155,7 @@
+   if op=='set' and args[1] in R:self.emit(0xcb,0xc0+8*self.ex(args[0])+R[args[1]]);return
+   if op=='res' and args[1] in R:self.emit(0xcb,0x80+8*self.ex(args[0])+R[args[1]]);return
+   if op=='in' and args==['a','(c)']:self.emit(0xed,0x78);return
++  if op=='in' and args[0]=='a' and args[1].startswith('('):self.emit(0xdb,self.ex(args[1][1:-1])&255);return
+   if op=='out' and args==['(c)','a']:self.emit(0xed,0x79);return
+   if op=='out' and args[1]=='a':self.emit(0xd3,self.ex(args[0][1:-1])&255);return
+   if op=='rst':self.emit(0xc7+self.ex(args[0]));return
+@@ -172,6 +174,12 @@
+     s=orig.split(';',1)[0].strip()
+     if not s:continue
+     try:
++     mq=re.fullmatch(r'([A-Za-z_][A-Za-z_0-9]*)\s+equ\s+(.+)',s,re.I)
++     if mq:
++      # V1.1: NOMBRE equ VALOR (constantes y variables fuera del bloque cargado)
++      if numpass==0:
++       if mq[1] in self.labels:raise ValueError('duplicate label')
++      self.labels[mq[1]]=self.ex(mq[2]);continue
+      if ':' in s:
+       lab,s=s.split(':',1);lab=lab.strip();s=s.strip()
+       if numpass==0:
