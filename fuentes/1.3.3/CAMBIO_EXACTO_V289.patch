@@ -1,0 +1,23 @@
+--- V284/src/gameplay.asm
++++ V289/src/gameplay.asm
+@@ -84,12 +84,20 @@
+  ld a,1
+ animation_wings_up:
+  ld (anim_phase),a
++ ; V2.8.9: once the LAST life is exhausted, do not run enemy AI,
++ ; projectile movement or collision logic during the two-second death finale.
++ ; Continue composing the last known enemy positions and the original three
++ ; ESF explosion frames; the 50Hz IM2 death counter remains unchanged.
++ ld a,(player_lives)
++ or a
++ jp z,combat_last_death_freeze
+  call wave_update
+  call bullet_update
+  call enemy_bullet_update      ; Enemy fire moves toward the player; independent of FIRE.
+  call shield_collisions        ; Active shield destroys nearby birds and their bullets.
+  call ship_hit_collisions      ; Unprotected impacts cost one life.
+  call player_fire
++combat_last_death_freeze:
+  call wave_unpaint_old       ; Restore old enemy colors ONLY in $F100 attribute shadow.
+  call player_unpaint_old     ; Restore old cockpit/engines ONLY in the attribute shadow.
+  call wave_paint_new         ; Build full new enemy palette before changing visible ULA attributes.

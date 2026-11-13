@@ -1,0 +1,8 @@
+# Los parches unificados contienen lineas de contexto vacias cuyo unico byte es un espacio.
+# Son caracteres sintacticos obligatorios del formato diff; no se deben eliminar.
+# Eximir EXCLUSIVAMENTE estos parches historicos del chequeo de espacios de Git.
+fuentes/1.3.3/*.patch -whitespace
+# Dos archivos ASM historicos terminan con lineas vacias intencionadas.
+# Evitar falsos positivos de EOF sin alterar un solo byte del fuente.
+fuentes/1.3.3/src/v11_bajo.asm whitespace=-blank-at-eof
+fuentes/1.3.3/src/video.asm whitespace=-blank-at-eof

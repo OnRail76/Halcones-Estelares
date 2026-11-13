@@ -1,0 +1,2721 @@
+diff -ruN -x __pycache__ -x '*.tap' -x '*.png' -x '*.bin' -x '*.scr' -x '*.gif' -x 'CAMBIOS_V1_3*.patch' HALCONES_ESTELARES_CODIGO_FUENTE_1_3_2/LEEME_FUENTES_FINAL_1_0.md hal/LEEME_FUENTES_FINAL_1_0.md
+--- HALCONES_ESTELARES_CODIGO_FUENTE_1_3_2/LEEME_FUENTES_FINAL_1_0.md	2026-11-12 12:18:40.639046997 +0100
++++ hal/LEEME_FUENTES_FINAL_1_0.md	2026-11-12 17:23:05.953830806 +0100
+@@ -1,9 +1,32 @@
+-# HALCONES ESTELARES — Código fuente (edición final 1.0 y versiones 1.1, 1.2, 1.3, 1.3.1 y 1.3.2)
++# HALCONES ESTELARES — Código fuente (edición final 1.0 y versiones 1.1, 1.2, 1.3, 1.3.1, 1.3.2 y 1.3.3)
+ 
+ **Autor y dirección:** Tony C. Ware · **Plataforma:** ZX Spectrum 48K · **Lenguaje:** Z80 ensamblador · **Año:** 2026.
+ 
+ Este paquete contiene **los fuentes verdaderos de la V2.8.9 estabilizada**, aprobada y publicada como edición **FINAL 1.0**. No corresponde a la V2.8.4 defectuosa ni a los experimentos de puntuación oculta. Se ha recompilado y comprobado byte a byte.
+ 
++## VERSIÓN 1.3.3: sonido a golpes, 16 estrellas y sin fondos
++
++Parte de la 1.3.2. El cambio exacto respecto a la 1.3.2 está en `CAMBIOS_V1_3_3.patch`.
++
++### Sonido a golpes
++- Medido en partida: las 32 estrellas gastaban un 11 % de la CPU y el sonido solo podía oírse un 22-25 % del tiempo, troceado. Por mucho que se le dé, entre el trozo de mitad de tick y el del final siempre hay ~20 ms de juego sin sonido: los efectos largos se oían cortados.
++- Nuevo tipo de segmento **golpe** (bit 7 del modo: `0x80` tono, `0x81` ruido): en cada tick suena **una sola ráfaga de unos 5 ms** (`snd_burst_len`, 700 unidades de 26 T), casi siempre entera en el trozo de mitad de tick, y el resto del tick silencio. Cada tick es un golpe limpio y un efecto largo es una serie de golpes con ritmo.
++- Disparo (chasquido + tiu), disparo enemigo (pip-pip), disparo e impactos del MOAI y explosión (estallido + cuatro golpes cada vez más graves) son ahora golpes. Escudo, vida extra, carteles y sirena siguen igual. El trozo de mitad de tick cuenta lo que de verdad toca (`snd_mid`).
++- Medido: el 97 % de los ticks con golpe suenan en una o dos ráfagas de 5,6 ms (mediana); ticks de más de 2 fotogramas: 0-0,3 %.
++
++### 16 estrellas
++- 16 estrellas en vez de 32 (`star_n`/`star_half` en `src/main.asm`), elegidas de las 32 para no dejar huecos, con los mismos tres ritmos y moviéndose igual de suave. El tiempo que liberan queda para el sonido.
++
++### Sin fondos lejanos
++- Fuera la nebulosa, la galaxia, el planeta y el cúmulo (y `tools/v12_fondos.py`): compartían celdas de color con cuervos, balas y explosiones. La luna y Júpiter del MOAI siguen igual. Memoria baja libre: 890 bytes.
++
++### Pruebas
++- `tests/test_v13_galaga.py`: el cielo de las oleadas queda vacío en las fases 1 y 2, Júpiter sigue en el MOAI, y el disparo suena como 2-3 ráfagas de menos de 8 ms.
++- Pasa toda la batería salvo los tres antiguos de siempre (`test_v282`, `test_v284` y el final de `test_v283`).
++- Memoria: principal `8000..BF32` (205 bytes libres), baja `76E0..7C85` (890 libres).
++
++**SHA-256 del TAP 1.3.3:** `0db551592d01900287f0dad4754b840589075fb50ae3e7405ea66dbf21266ddf` (`HALCONES_ESTELARES_1_3_3.tap`).
++
+ ## VERSIÓN 1.3.2: melodía del título una sola vez
+ 
+ Parte de la 1.3.1. El cambio exacto respecto a la 1.3.1 está en `CAMBIOS_V1_3_2.patch`.
+diff -ruN -x __pycache__ -x '*.tap' -x '*.png' -x '*.bin' -x '*.scr' -x '*.gif' -x 'CAMBIOS_V1_3*.patch' HALCONES_ESTELARES_CODIGO_FUENTE_1_3_2/SHA256_TAP_FINAL.txt hal/SHA256_TAP_FINAL.txt
+--- HALCONES_ESTELARES_CODIGO_FUENTE_1_3_2/SHA256_TAP_FINAL.txt	2026-11-12 12:18:40.646529062 +0100
++++ hal/SHA256_TAP_FINAL.txt	2026-11-12 17:23:05.962922757 +0100
+@@ -1,3 +1,4 @@
++0db551592d01900287f0dad4754b840589075fb50ae3e7405ea66dbf21266ddf  HALCONES_ESTELARES_1_3_3.tap
+ 456d80834563321eb171b6f52e1f23d7c467b6f330b7b2d9e13eb9894605fe6b  HALCONES_ESTELARES_1_3_2.tap
+ cb45c1889200fb89119093290373329f17b75a45ec43789683d976a3c110f96a  HALCONES_ESTELARES_1_3_1.tap
+ 2dd9b9f442544e8a792db3b747c946fc452404ecdfa0f3d597a445ce4adf36d7  HALCONES_ESTELARES_1_3.tap
+diff -ruN -x __pycache__ -x '*.tap' -x '*.png' -x '*.bin' -x '*.scr' -x '*.gif' -x 'CAMBIOS_V1_3*.patch' HALCONES_ESTELARES_CODIGO_FUENTE_1_3_2/build/starter.asm hal/build/starter.asm
+--- HALCONES_ESTELARES_CODIGO_FUENTE_1_3_2/build/starter.asm	2026-11-12 12:18:43.148236636 +0100
++++ hal/build/starter.asm	2026-11-12 17:23:05.753215601 +0100
+@@ -64,43 +64,27 @@
+ bbe_ok equ 31513
+ bbe_row equ 31527
+ bbe_store equ 31573
+-bg_clear equ 31577
+-bgc_row equ 31579
+-bgc_byte equ 31587
+-bg_row_addr equ 31598
+-bg_draw equ 31613
+-bgd_line equ 31652
+-bgd_byte equ 31677
+-bgd_same_row equ 31721
+-bg_pair equ 31731
+-bg_nibble equ 31767
+-snd_budget_set equ 31785
+-snd_budget_q equ 31792
+-snd_budget_pos equ 31814
+-snd_budget_ok equ 31824
+-led_frame_tick equ 31839
+-led_all equ 31867
+-led_sweep equ 31870
+-led_frame_clock_store equ 31895
+-led_frame_apply equ 31898
+-led_colors_ok equ 31910
+-led_one equ 31932
+-led_write equ 31939
+-led_danger equ 31959
+-led_danger_loop equ 31966
+-led_danger_next equ 31984
+-badge_shine equ 31992
+-badge_tick equ 32002
+-badge_step equ 32018
+-badge_row equ 32023
+-badge_col equ 32025
+-badge_put equ 32049
+-bg_patterns equ 32086
+-bg_0 equ 32102
+-bg_1 equ 32184
+-bg_2 equ 32266
+-bg_3 equ 32348
+-bg_table equ 32430
++snd_budget_set equ 31577
++snd_budget_q equ 31584
++snd_budget_pos equ 31606
++snd_budget_ok equ 31616
++led_frame_tick equ 31631
++led_all equ 31659
++led_sweep equ 31662
++led_frame_clock_store equ 31687
++led_frame_apply equ 31690
++led_colors_ok equ 31702
++led_one equ 31724
++led_write equ 31731
++led_danger equ 31751
++led_danger_loop equ 31758
++led_danger_next equ 31776
++badge_shine equ 31784
++badge_tick equ 31794
++badge_step equ 31810
++badge_row equ 31815
++badge_col equ 31817
++badge_put equ 31841
+ note_hp equ 64776
+ tune_title equ 64812
+ tune_victory equ 64865
+@@ -114,6 +98,10 @@
+ enemy_bytes equ 60
+ bullet_n equ 2             ; V1.2: como mucho 2 balas propias a la vez (al estilo Galaga)
+ bullet_bytes equ 6
++star_n equ 16               ; V1.3.3: estrellas (antes 32)
++star_half equ 8             ; las que se mueven en cada tick
++star_bytes equ 48           ; star_n * 3
++star_half_bytes equ 24      ; star_half * 3
+ org 0x8000
+ entry:
+  di
+@@ -285,14 +273,12 @@
+ ; stars_v13_* are the only active star routines.
+ 
+ stars:
+- db 21,6,0, 29,42,1, 25,19,2, 36,113,0
+- db 47,67,1, 53,150,2, 64,33,0, 72,92,1
+- db 80,12,2, 91,41,0, 108,120,1, 116,25,2
+- db 123,72,0, 137,173,1, 142,58,2, 153,7,0
+- db 163,125,1, 174,87,2, 185,18,0, 28,178,1
+- db 44,3,2, 60,183,0, 76,142,1, 95,95,2
+- db 113,179,0, 132,132,1, 150,161,2, 169,50,0
+- db 182,166,1, 33,84,2, 106,6,0, 30,163,1
++ ; V1.3.3: 16 estrellas (antes 32) para dar ese tiempo al sonido; dos bancos
++ ; de 8 que se mueven en ticks alternos, con los mismos tres ritmos.
++ db 21,6,0, 25,19,2, 47,67,1, 64,33,0
++ db 80,12,2, 108,120,1, 123,72,0, 142,58,2
++ db 163,125,1, 185,18,0, 44,3,2, 76,142,1
++ db 113,179,0, 150,161,2, 182,166,1, 106,6,0
+ 
+ hud_source: dw 0
+ hud_y: db 0
+@@ -813,8 +799,7 @@
+  call shield_init          ; V1.8: arm real-time shield, lives and enemy projectiles.
+  call color_shadow_init      ; Snapshot current VRAM color attrs into private 768-byte RAM plane.
+  call led_frame_apply        ; Only the upper warning lamp begins BRIGHT; other two start dim.
+- call bg_draw                ; V1.2: fondo lejano de la fase 1 en el cielo...
+- call boss_scene_sync        ; ...y en la imagen de trabajo y la pantalla.
++ call boss_scene_sync        ; Cielo inmovil -> imagen de trabajo y pantalla.
+  call wave_card_start        ; V1.1: cartel OLEADA 1 (tras copiar los atributos).
+  jp hud_draw_all             ; V1.2: marcador completo con los valores de la partida nueva.
+ 
+@@ -3703,7 +3688,6 @@
+  ld a,18                    ; 18 player shot hits to defeat boss (prototype balance).
+  ld (boss_hp),a
+  call boss_v12_start        ; V1.2: grietas, boca, derrumbe y luna a cero.
+- call bg_clear              ; V1.2: el MOAI y Jupiter ocupan el cielo sin fondo.
+  ld a,8
+  ld (boss_death_left),a  ; Short red/white destruction flash on defeat.
+  xor a
+@@ -3877,7 +3861,6 @@
+  inc a
+  ld (phase_number),a
+ boss_phase_count_done:
+- call bg_draw               ; V1.2: fondo de la fase nueva (se ve al volver).
+  call phase_interlude_enter ; Black screen, 150 real IM2 ticks, automatic return.
+  xor a
+  ld (wave_stage),a       ; Start next circuit with CROW.
+@@ -4617,7 +4600,7 @@
+ scrub_y: db 0             ; Scanline repair cursor, 0..191.
+ scrub_rows_left: db 0     ; Countdown over 8 rows.
+ 
+-; ESF V1.3 optimized 32-star parallax, Z80 standard assembly, ORG set by main.asm.
++; ESF V1.3 optimized star parallax (V1.3.3: 16 estrellas, star_n), Z80 standard assembly, ORG set by main.asm.
+ ; Runtime cache records: physical screen address LO/HI + mask (3 bytes/star).
+ ; Single address calculation per star/update instead of four per update.
+ ; Bounded to x<192, y<192, separate immutable sky plane at $D800.
+@@ -4633,12 +4616,12 @@
+  call stars_v13_select_bank    ; Work on alternating 16-star slices per update.
+  ld hl,(stars_v13_active_cache) ; V1.1: solo se guarda la mitad que se mueve
+  ld de,(stars_v13_active_previous) ; (la otra mitad no cambia este tick).
+- ld bc,48
++ ld bc,star_half_bytes
+  ldir
+  ; V1.1: borrado especializado de las 16 estrellas que se mueven: quita su bit
+  ; de la imagen de trabajo y repone ese bit del cielo inmutable (planeta/MOAI).
+  ld hl,(stars_v13_active_cache)
+- ld b,16
++ ld b,star_half
+ stars_v11_clear_loop:
+  ld e,(hl)
+  inc hl
+@@ -4673,7 +4656,7 @@
+ 
+ stars_v13_move:
+  ld hl,(stars_v13_active_stars) ; HL=first record of selected 16-star slice.
+- ld b,16                       ; Move only 16 stars this tick, alternating banks.
++ ld b,star_half                ; Move only half stars this tick, alternating banks.
+ stars_v13_move_loop:
+  push bc                        ; Save record loop count.
+  inc hl                         ; HL -> mutable Y.
+@@ -4715,11 +4698,11 @@
+  ld a,(frame_index)            ; Global game tick counter.
+  and 1                         ; Alternate two banks.
+  jp z,stars_v13_select_first  ; 0 selects first 16-star block.
+- ld hl,stars+48               ; Second group begins 16*3 bytes later.
++ ld hl,stars+star_half_bytes               ; Second group begins 16*3 bytes later.
+  ld (stars_v13_active_stars),hl ; Save data pointer.
+- ld hl,stars_v13_cache+48      ; Second half of current cache.
++ ld hl,stars_v13_cache+star_half_bytes      ; Second half of current cache.
+  ld (stars_v13_active_cache),hl ; Save cache pointer.
+- ld hl,stars_v13_previous+48   ; Second half of old cache.
++ ld hl,stars_v13_previous+star_half_bytes   ; Second half of old cache.
+  ld (stars_v13_active_previous),hl ; Save previous pointer.
+  ret                            ; Bank selection complete.
+ stars_v13_select_first:
+@@ -4736,7 +4719,7 @@
+ stars_v13_cache_rebuild:
+  ld ix,stars                  ; IX walks 32 records (X,Y,rate).
+  ld iy,stars_v13_cache        ; IY walks 32 screen_addr/bitmask records.
+- ld b,32                      ; B=star count.
++ ld b,star_n                  ; B=star count.
+ stars_v13_cache_loop:
+  push bc                       ; Save star count during address lookup.
+  ld a,(ix+0)                  ; Read X from star data.
+@@ -4780,7 +4763,7 @@
+  ; V1.1: misma direccion que stars_v13_screen_addr, sin IX/IY ni variables.
+  ld hl,(stars_v13_active_stars) ; HL = registros (x,y,ritmo) de las 16 que se mueven.
+  ld de,(stars_v13_active_cache) ; DE = sus direcciones en la cache.
+- ld b,16
++ ld b,star_half
+ stars_v11_rebuild_loop:
+  ld c,(hl)                      ; C = X
+  inc hl
+@@ -4820,7 +4803,7 @@
+ stars_v13_masks_init:
+  ld ix,stars                   ; IX iterates immutable star X/Y/rate records.
+  ld iy,stars_v13_cache         ; IY iterates 3-byte cache records.
+- ld b,32                       ; 32 star masks.
++ ld b,star_n                   ; star masks.
+ stars_v13_mask_init_loop:
+  push bc                        ; Preserve loop counter.
+  ld a,(ix+0)                   ; Star X coordinate.
+@@ -4844,7 +4827,7 @@
+ stars_v13_draw_all:
+  ; V1.1: bucle OR especializado (sin modo ni PUSH/POP por estrella).
+  ld hl,stars_v13_cache
+- ld b,32
++ ld b,star_n
+ stars_v11_draw_loop:
+  ld e,(hl)
+  inc hl
+@@ -4866,15 +4849,15 @@
+  jp stars_v13_present_new      ; Display current stars from work buffer.
+ stars_v13_present_old:
+  ld hl,(stars_v13_active_previous) ; Previous 16 moved-star addresses.
+- ld b,16                         ; Only this bank moved this tick.
++ ld b,star_half                  ; Only this bank moved this tick.
+  jp stars_v13_sync_loop          ; Sync completed bytes.
+ stars_v13_present_new:
+  ld hl,(stars_v13_active_cache) ; Current 16 moved-star addresses.
+- ld b,16                         ; Other 16 unchanged; actor rects repaint as needed.
++ ld b,star_half                  ; Other half unchanged; actor rects repaint as needed.
+  jp stars_v13_sync_loop          ; Sync completed bytes.
+ stars_v13_present_initial:
+  ld hl,stars_v13_cache          ; All 32 current positions after initialization.
+- ld b,32                         ; Initial display requires all stars.
++ ld b,star_n                     ; Initial display requires all stars.
+  jp stars_v13_sync_loop          ; Sync first still frame.
+ stars_v13_sync_loop:
+  push bc                       ; Preserve outer counter, LDI changes BC.
+@@ -4898,8 +4881,8 @@
+ stars_v13_active_stars: dw 0    ; Pointer to selected 16 star records.
+ stars_v13_active_cache: dw 0    ; Pointer to selected 16 cached addresses.
+ stars_v13_active_previous: dw 0 ; Pointer to previous selected cached addresses.
+-stars_v13_cache: ds 96      ; 32 records of current video address and bitmask.
+-stars_v13_previous: ds 96   ; 32 records of old video address and bitmask.
++stars_v13_cache: ds star_bytes      ; 32 records of current video address and bitmask.
++stars_v13_previous: ds star_bytes   ; 32 records of old video address and bitmask.
+ 
+ ; ESF fixed-screen 48K arcade renderer. Purpose: motion before embellishments.
+ ; Native 0x4000 picture, 0x5800 attributes. XOR sprites reversible byte-for-byte
+@@ -5300,12 +5283,6 @@
+ hud_tmp equ 0xf048
+ face_k equ 0xf049
+ enemy_count equ 0xf0ab
+-bg_x equ 0xf0ac
+-bg_y equ 0xf0ad
+-bg_src equ 0xf0ae
+-bg_lines equ 0xf0b0
+-bg_k equ 0xf0b1
+-bg_lv equ 0xf0b2      ; V1.2: enemigos en juego (10 cuervos, 6 el resto)
+ snd_idle equ 0xf0b4         ; V1.3: rato libre del tick (unidades de 26 T)
+ snd_budget equ 0xf0b6       ; V1.3: trozo de sonido para la mitad del tick
+ snd_mid_ok equ 0xf0b8       ; V1.3: 1 = el trozo de mitad de tick aun no ha sonado
+@@ -5796,6 +5773,9 @@
+ mus_note equ 0xf05d
+ mus_loop equ 0xf05e
+ snd_play_mode equ 0xf060
++snd_shortf equ 0xf0bb       ; V1.3.3: 0x80 = segmento de golpe (rafaga corta)
++snd_burst equ 0xf0bc        ; V1.3.3: lo que le queda a la rafaga de este tick
++snd_burst_len equ 700       ; unidades de 26 T: 18 200 T, unos 5 ms
+ 
+ ; HL = efecto. Solo suena si su prioridad es >= la del efecto en curso.
+ sfx_start:
+@@ -5829,9 +5809,13 @@
+  ld (snd_left),a
+  ld a,(hl)
+  inc hl
++ ld e,a
++ and 0x80                   ; V1.3.3: bit 7 = golpe: una rafaga corta por tick
++ ld (snd_shortf),a
++ xor e
+  ld (snd_mode),a
+  ld (snd_seg),hl
+- ret
++ jr snd_burst_reset
+ sfx_end:
+  xor a
+  ld (snd_left),a
+@@ -5859,6 +5843,32 @@
+  ld hl,(snd_hp)
+  add hl,de
+  ld (snd_hp),hl
++snd_burst_reset:
++ ld hl,snd_burst_len
++ ld (snd_burst),hl
++ ret
++
++; V1.3.3: HL = semiperiodo. Gasta esa media onda de la rafaga del tick;
++; acarreo = la rafaga ya se acabo (silencio hasta el tick siguiente).
++; Conserva HL y DE.
++snd_burst_use:
++ push hl
++ push de
++ ex de,hl
++ ld hl,(snd_burst)
++ or a
++ sbc hl,de
++ jr c,snd_burst_out
++ ld de,8
++ sbc hl,de
++ jr nc,snd_burst_keep
++snd_burst_out:
++ ld hl,0
++ scf
++snd_burst_keep:
++ ld (snd_burst),hl
++ pop de
++ pop hl
+  ret
+ 
+ ; Toca el efecto en curso hasta que tick_irqs deje de valer E (o espera).
+@@ -5873,7 +5883,25 @@
+  jr z,snd_rest
+  ld hl,(snd_hp)
+  ld (snd_play_mode),a
+- jr tone_half
++ ld a,(snd_shortf)
++ or a
++ jr z,tone_half
++; V1.3.3: golpe: suena mientras quede rafaga y luego espera en silencio.
++burst_half:
++ call snd_burst_use
++ jp c,snd_rest
++ call snd_half
++ push hl
++ ld bc,(snd_idle)
++ add hl,bc
++ ld bc,8
++ add hl,bc
++ ld (snd_idle),hl
++ pop hl
++ ld a,(tick_irqs)
++ cp e
++ jr z,burst_half
++ ret
+ ; A = modo (0 tono, 1 ruido), HL = semiperiodo: suena hasta la siguiente IRQ.
+ tone_until_irq:
+  ld (snd_play_mode),a
+@@ -5957,23 +5985,34 @@
+  ld (snd_play_mode),a
+  push bc
+  push de
+- ld de,(snd_budget)
+- ld hl,(snd_idle)           ; cuenta como rato libre del tick (el final
+- add hl,de                  ; del tick sobrara eso menos)
+- ld (snd_idle),hl
++ ld de,(snd_budget)         ; DE = lo que queda del trozo
+  ld hl,(snd_hp)
+ snd_mid_loop:
++ ld a,(snd_shortf)          ; V1.3.3: un golpe acaba antes si se le acaba
++ or a                       ; la rafaga del tick
++ jr z,snd_mid_go
++ call snd_burst_use
++ jr c,snd_mid_end
++snd_mid_go:
+  call snd_half
+  ex de,hl
+  or a
+  sbc hl,de
+- jr c,snd_mid_end
++ jr c,snd_mid_zero
+  ld bc,8
+  sbc hl,bc
+- jr c,snd_mid_end
++ jr c,snd_mid_zero
+  ex de,hl
+  jr snd_mid_loop
++snd_mid_zero:
++ ld de,0
+ snd_mid_end:
++ ld hl,(snd_budget)         ; lo tocado cuenta como rato libre del tick (el
++ or a                       ; final del tick sobrara eso menos)
++ sbc hl,de
++ ld de,(snd_idle)
++ add hl,de
++ ld (snd_idle),hl
+  pop de
+  pop bc
+  ret
+@@ -6080,41 +6119,43 @@
+  jp sfx_start
+ 
+ ; efectos: prioridad, segmentos (semiperiodo, delta, ticks, modo), fin
+-; V1.3: rehechos para el beeper troceado (suena a rafagas, dos por tick): golpe
+-; de ruido al principio, que es lo que mejor se oye a trozos, y barridos cortos.
++; V1.3.3: GOLPES. Modo con el bit 7 (0x80 tono, 0x81 ruido): en cada tick
++; suena una sola rafaga de unos 5 ms, casi siempre entera en el trozo de mitad
++; de tick, y el resto del tick silencio. Asi el beeper ya no se oye cortado:
++; cada tick es un golpe limpio y los efectos largos son golpes seguidos.
+ fx_shot: db 1
+- dw 5
+- db 0,1,1                   ; chasquido
+- dw 28
+- db 22,3,0                  ; piu que cae
++ dw 6
++ db 0,1,0x81                ; chasquido
++ dw 30
++ db 20,1,0x80               ; tiu
+  dw 0
+ fx_enemy_fire: db 1
+- dw 90
+- db 242,3,0                 ; trino que sube
++ dw 80
++ db 236,2,0x80              ; pip-pip que sube
+  dw 0
+ fx_boss_fire: db 2
+- dw 60
+- db 0,1,1                   ; soplido
+- dw 260
+- db 24,3,0                  ; disparo grave
++ dw 50
++ db 0,1,0x81                ; soplido
++ dw 110
++ db 24,2,0x80               ; dos golpes graves
+  dw 0
+ fx_explode: db 2
+- dw 4
+- db 0,2,1                   ; estallido
+- dw 18
+- db 6,6,1                   ; retumbo que se apaga
++ dw 5
++ db 0,1,0x81                ; estallido
++ dw 14
++ db 8,4,0x81                ; cuatro golpes de ruido cada vez mas graves
+  dw 0
+ fx_boss_hit: db 2
+  dw 30
+- db 0,1,1                   ; golpe en la piedra
+- dw 340
+- db 40,2,0
++ db 0,1,0x81                ; golpe en la piedra
++ dw 70
++ db 0,1,0x81
+  dw 0
+ fx_boss_hit_low: db 2
+  dw 12
+- db 0,1,1                   ; la piedra cruje (le queda poco)
+- dw 140
+- db 30,3,0
++ db 0,1,0x81                ; la piedra cruje (le queda poco)
++ dw 90
++ db 30,2,0x80
+  dw 0
+ fx_shield_on: db 3
+  dw 420
+diff -ruN -x __pycache__ -x '*.tap' -x '*.png' -x '*.bin' -x '*.scr' -x '*.gif' -x 'CAMBIOS_V1_3*.patch' HALCONES_ESTELARES_CODIGO_FUENTE_1_3_2/build/starter.sym.json hal/build/starter.sym.json
+--- HALCONES_ESTELARES_CODIGO_FUENTE_1_3_2/build/starter.sym.json	2026-11-12 12:18:43.290331291 +0100
++++ hal/build/starter.sym.json	2026-11-12 17:23:05.903912619 +0100
+@@ -65,43 +65,27 @@
+   "bbe_ok": 31513,
+   "bbe_row": 31527,
+   "bbe_store": 31573,
+-  "bg_clear": 31577,
+-  "bgc_row": 31579,
+-  "bgc_byte": 31587,
+-  "bg_row_addr": 31598,
+-  "bg_draw": 31613,
+-  "bgd_line": 31652,
+-  "bgd_byte": 31677,
+-  "bgd_same_row": 31721,
+-  "bg_pair": 31731,
+-  "bg_nibble": 31767,
+-  "snd_budget_set": 31785,
+-  "snd_budget_q": 31792,
+-  "snd_budget_pos": 31814,
+-  "snd_budget_ok": 31824,
+-  "led_frame_tick": 31839,
+-  "led_all": 31867,
+-  "led_sweep": 31870,
+-  "led_frame_clock_store": 31895,
+-  "led_frame_apply": 31898,
+-  "led_colors_ok": 31910,
+-  "led_one": 31932,
+-  "led_write": 31939,
+-  "led_danger": 31959,
+-  "led_danger_loop": 31966,
+-  "led_danger_next": 31984,
+-  "badge_shine": 31992,
+-  "badge_tick": 32002,
+-  "badge_step": 32018,
+-  "badge_row": 32023,
+-  "badge_col": 32025,
+-  "badge_put": 32049,
+-  "bg_patterns": 32086,
+-  "bg_0": 32102,
+-  "bg_1": 32184,
+-  "bg_2": 32266,
+-  "bg_3": 32348,
+-  "bg_table": 32430,
++  "snd_budget_set": 31577,
++  "snd_budget_q": 31584,
++  "snd_budget_pos": 31606,
++  "snd_budget_ok": 31616,
++  "led_frame_tick": 31631,
++  "led_all": 31659,
++  "led_sweep": 31662,
++  "led_frame_clock_store": 31687,
++  "led_frame_apply": 31690,
++  "led_colors_ok": 31702,
++  "led_one": 31724,
++  "led_write": 31731,
++  "led_danger": 31751,
++  "led_danger_loop": 31758,
++  "led_danger_next": 31776,
++  "badge_shine": 31784,
++  "badge_tick": 31794,
++  "badge_step": 31810,
++  "badge_row": 31815,
++  "badge_col": 31817,
++  "badge_put": 31841,
+   "note_hp": 64776,
+   "tune_title": 64812,
+   "tune_victory": 64865,
+@@ -111,6 +95,10 @@
+   "enemy_bytes": 60,
+   "bullet_n": 2,
+   "bullet_bytes": 6,
++  "star_n": 16,
++  "star_half": 8,
++  "star_bytes": 48,
++  "star_half_bytes": 24,
+   "entry": 32768,
+   "title_session_start": 32803,
+   "main_loop": 32830,
+@@ -125,492 +113,492 @@
+   "frame_source": 33059,
+   "frame_y": 33061,
+   "stars": 33062,
+-  "hud_source": 33158,
+-  "hud_y": 33160,
+-  "star_x": 33161,
+-  "star_y": 33162,
+-  "frame_index": 33163,
+-  "irq_im2_install": 33164,
+-  "irq_im2_handler": 33196,
+-  "irq_paused": 33223,
+-  "title_screen_show": 33228,
++  "hud_source": 33110,
++  "hud_y": 33112,
++  "star_x": 33113,
++  "star_y": 33114,
++  "frame_index": 33115,
++  "irq_im2_install": 33116,
++  "irq_im2_handler": 33148,
++  "irq_paused": 33175,
++  "title_screen_show": 33180,
+   "lz_src": 61514,
+-  "lz_unpack": 33234,
+-  "lz_match": 33248,
+-  "lz_far": 33266,
+-  "lz_copy": 33280,
+-  "title_screen_wait": 33293,
+-  "title_wait_release": 33317,
+-  "title_wait_press": 33325,
+-  "title_wait_start_release": 33345,
+-  "title_pulse_tick": 33352,
+-  "title_pulse_restore": 33393,
+-  "title_pulse_restore_bit": 33396,
+-  "title_pulse_restore_skip": 33401,
+-  "title_pulse_white": 33425,
+-  "title_pulse_white_bit": 33429,
+-  "title_pulse_white_next": 33441,
+-  "title_pulse_done": 33453,
++  "lz_unpack": 33186,
++  "lz_match": 33200,
++  "lz_far": 33218,
++  "lz_copy": 33232,
++  "title_screen_wait": 33245,
++  "title_wait_release": 33269,
++  "title_wait_press": 33277,
++  "title_wait_start_release": 33297,
++  "title_pulse_tick": 33304,
++  "title_pulse_restore": 33345,
++  "title_pulse_restore_bit": 33348,
++  "title_pulse_restore_skip": 33353,
++  "title_pulse_white": 33377,
++  "title_pulse_white_bit": 33381,
++  "title_pulse_white_next": 33393,
++  "title_pulse_done": 33405,
+   "pulse_mask": 61552,
+-  "title_pulse_times": 33458,
+-  "title_pulse_countdown": 33462,
+-  "title_pulse_phase": 33463,
+-  "gameover_irq_tick": 33464,
+-  "gameover_enter": 33480,
+-  "gameover_tune": 33517,
+-  "gameover_wait_3_seconds": 33523,
+-  "gameover_wait_release": 33540,
+-  "gameover_wait_press": 33548,
+-  "gameover_screen_show": 33559,
+-  "gameover_prompt_show": 33568,
+-  "gameover_prompt_cell": 33575,
+-  "gameover_score_draw": 33580,
+-  "gameover_digit_draw": 33628,
+-  "gameover_glyph_advance": 33644,
+-  "gameover_glyph_found": 33647,
+-  "gameover_digit_row": 33655,
+-  "gameover_mode": 33700,
+-  "gameover_timer": 33701,
+-  "go_col": 33703,
+-  "go_y": 33704,
+-  "go_glyph": 33705,
+-  "phase_interlude_enter": 33707,
+-  "phase_interlude_wait": 33738,
+-  "phase_screen_show": 33776,
+-  "phase_number_draw": 33785,
+-  "phase_divide10": 33790,
+-  "phase_tens_done": 33799,
+-  "phase_number": 33817,
+-  "phase_units": 33818,
+-  "combat_init": 33819,
+-  "combat_tick": 33974,
+-  "animation_wings_up": 34066,
+-  "combat_last_death_freeze": 34094,
+-  "color_shadow_init": 34163,
+-  "color_shadow_present": 34175,
+-  "color_old_pair_loop": 34187,
+-  "color_old_pair_next": 34207,
+-  "color_present_bullets": 34266,
+-  "color_bullet_loop": 34268,
+-  "color_bullet_next": 34292,
+-  "color_present_shield_old": 34301,
+-  "color_present_shield_new": 34316,
+-  "color_present_shield": 34328,
+-  "color_present_six": 34339,
+-  "color_present_six_loop": 34343,
+-  "color_present_enemy": 34356,
+-  "color_present_ship": 34374,
+-  "color_ship_width_ok": 34387,
+-  "color_present_box": 34393,
+-  "color_box_width_ok": 34417,
+-  "color_box_height_ok": 34444,
+-  "color_box_row5": 34503,
+-  "color_box_row4": 34523,
+-  "color_box_row3": 34541,
+-  "color_box_row2": 34557,
+-  "color_box_row1": 34571,
+-  "color_box_next_row": 34583,
+-  "color_rect_w": 34595,
+-  "color_rect_h": 34596,
+-  "color_col": 34597,
+-  "color_row": 34598,
+-  "wave_unpaint_old": 34599,
+-  "wave_unpaint_loop": 34607,
+-  "wave_paint_new": 34625,
+-  "wave_paint_loop": 34633,
+-  "paint_enemy_attr_ix": 34660,
+-  "paint_enemy_rows": 34696,
+-  "paint_enemy_cols": 34698,
+-  "ship_attr_plot": 34712,
+-  "ship_paint_cockpit": 34748,
+-  "ship_paint_engines": 34782,
+-  "player_unpaint_old": 34863,
+-  "player_paint_new": 34893,
+-  "player_paint_live": 34912,
+-  "ship_attr_x": 34942,
+-  "ship_attr_y": 34943,
+-  "ship_attr_ink": 34944,
+-  "player_paint_explosion": 34945,
+-  "composite_update": 34962,
+-  "composite_restore_old": 34999,
+-  "co_re_e": 35007,
+-  "co_re_enemy_b": 35025,
+-  "co_re_b": 35043,
+-  "composite_present_old": 35115,
+-  "co_pre_b": 35121,
+-  "co_pre_enemy_b": 35139,
+-  "composite_present_new": 35155,
+-  "co_prn_b": 35164,
+-  "co_prn_enemy_b": 35182,
+-  "composite_present_enemy_pairs": 35195,
+-  "co_union_loop": 35207,
+-  "comp_present_enemy_pair": 35222,
+-  "co_changed": 35239,
+-  "co_union_wide": 35324,
+-  "co_union_y": 35331,
+-  "co_old_x": 35353,
+-  "co_present_fallback": 35354,
+-  "co_present_new_only": 35357,
+-  "comp_present_ship_union": 35369,
+-  "cps_same_x": 35419,
+-  "cps_right": 35433,
+-  "cps_left": 35447,
+-  "cps_y": 35458,
+-  "cps_moved_up": 35482,
+-  "comp_present_shield_pair": 35497,
+-  "cps_fallback": 35555,
+-  "comp_restore_enemy_ix": 35605,
+-  "comp_present_enemy_ix": 35616,
+-  "enemy_box_ix": 35627,
+-  "enemy_unchanged": 35666,
+-  "enemy_rect_ix": 35687,
+-  "comp_restore_bullet_ix": 35706,
+-  "comp_present_bullet_ix": 35724,
+-  "bullet_rect_dest": 35739,
+-  "enemy_palettes": 35773,
+-  "old_anim_phase": 35777,
+-  "anim_phase": 35778,
+-  "draw_anim_phase": 35779,
+-  "enemy_paint_color": 35780,
+-  "old_enemy_slots": 35781,
+-  "old_bullet_slots": 35841,
+-  "combat_render": 35847,
+-  "player_respawn_tick": 35897,
+-  "player_draw": 35937,
+-  "player_draw_live": 35960,
+-  "player_flame_ready": 36004,
+-  "player_draw_death": 36078,
+-  "ship_blast_second": 36090,
+-  "ship_blast_third": 36099,
+-  "ship_blast_ready": 36102,
+-  "player_keys": 36130,
+-  "player_left_step": 36160,
+-  "player_no_left": 36165,
+-  "player_right_step": 36189,
+-  "player_no_right": 36194,
+-  "player_fire": 36198,
+-  "player_fire_live": 36218,
+-  "player_find_slot": 36248,
+-  "player_slot_found": 36263,
+-  "player_fire_release": 36287,
+-  "wave_update": 36292,
+-  "wave_advance_stage": 36328,
+-  "wave_stage_store": 36346,
+-  "wave_spawn": 36349,
+-  "wave_spawn_now": 36352,
+-  "wave_spawn_copy": 36371,
+-  "wave_spawn_count": 36389,
+-  "wave_update_live": 36416,
+-  "wave_move_loop": 36436,
+-  "wave_move_live": 36461,
+-  "wave_speed_ready_v25": 36504,
+-  "wave_end_bird": 36542,
+-  "wave_rush_reenter": 36549,
+-  "wave_rush_hover": 36564,
+-  "wave_skip_vertical": 36593,
+-  "wave_stage_clock_ready": 36617,
+-  "wave_kamikaze_threshold": 36634,
+-  "wave_steer_left": 36664,
+-  "wave_curve_motion": 36677,
+-  "wave_move_next": 36699,
+-  "wave_check_live": 36722,
+-  "wave_rush_regroup": 36734,
+-  "wave_rush_scan": 36752,
+-  "wave_rush_scan_next": 36771,
+-  "wave_rush_check_clock": 36801,
+-  "wave_rush_release_loop": 36818,
+-  "wave_rush_release_next": 36830,
+-  "rush_rest_irq_tick": 36838,
+-  "rush_rest_ticks": 36848,
+-  "rush_pause_active": 36849,
+-  "rush_hover_found": 36850,
+-  "led_anim_clock": 36851,
+-  "led_anim_phase": 36852,
+-  "hunter_wave_update": 36853,
+-  "hunter_drift_store": 36886,
+-  "hunter_check_pair_launch": 36889,
+-  "hunter_try_launch_v25": 36903,
+-  "hunter_after_launch_v25": 36913,
+-  "hunter_w_loop": 36925,
+-  "hunter_w_store_y": 36962,
+-  "hunter_w_sway": 36965,
+-  "hunter_w_explosion": 36996,
+-  "hunter_w_dive": 37013,
+-  "hunter_w_target_left": 37043,
+-  "hunter_w_target_ready": 37046,
+-  "hunter_w_approach_right": 37064,
+-  "hunter_w_turnback": 37071,
+-  "hunter_w_return": 37078,
+-  "hunter_return_home_y_ok": 37092,
+-  "hunter_w_return_y": 37110,
+-  "hunter_w_rejoin": 37116,
+-  "hunter_w_next": 37126,
+-  "hunter_pair_launch": 37162,
+-  "hunter_single_launch": 37194,
+-  "hunter_single_find": 37204,
+-  "hunter_single_ready": 37221,
+-  "hunter_single_min_ok": 37237,
+-  "hunter_single_max_ok": 37244,
+-  "hunter_pair_try_row": 37257,
+-  "hunter_pair_lower": 37272,
+-  "hunter_pair_ready": 37278,
+-  "hunter_target_min_ok": 37308,
+-  "hunter_target_max_ok": 37315,
+-  "hunter_left_slot_ready": 37347,
+-  "hunter_pair_fire": 37365,
+-  "hunter_fire_left_ready": 37401,
+-  "hunter_single_fire": 37412,
+-  "hunter_single_fire_slot": 37427,
+-  "hunter_single_fire_ready": 37431,
+-  "hunter_fire_one": 37434,
+-  "hunter_fire_find": 37446,
+-  "hunter_fire_spawn": 37461,
+-  "hunter_pair_completion": 37488,
+-  "hunter_left_check": 37513,
+-  "hunter_single_completion": 37546,
+-  "hunter_single_complete_slot": 37561,
+-  "hunter_single_completion_check": 37565,
+-  "crow_wave_update": 37584,
+-  "crow_select_scout": 37602,
+-  "crow_scout_selected": 37620,
+-  "crow_wave_movement": 37624,
+-  "crow_wave_loop": 37632,
+-  "crow_move_across": 37680,
+-  "crow_scout_dive": 37706,
+-  "crow_scout_left": 37743,
+-  "crow_scout_turn": 37756,
+-  "crow_scout_return": 37763,
+-  "crow_scout_home": 37786,
+-  "crow_scout_joins": 37789,
+-  "crow_explosion_tick": 37799,
+-  "crow_wave_next": 37813,
+-  "wave_draw": 37836,
+-  "wave_draw_loop": 37850,
+-  "enemy_draw_ix": 37863,
+-  "enemy_kind_raptor": 37906,
+-  "enemy_kind_falcon": 37922,
+-  "enemy_kind_crow": 37938,
+-  "crow_sprite_ready": 37950,
+-  "enemy_draw_explosion": 37982,
+-  "enemy_kind_ready": 38004,
+-  "bullet_update": 38033,
+-  "bullet_update_loop": 38039,
+-  "bullet_continue": 38062,
+-  "bullet_check_enemy": 38083,
+-  "bullet_no_hit": 38141,
+-  "bullet_check_done": 38154,
+-  "bullet_check_boss": 38158,
+-  "boss_bullet_hit_score": 38211,
+-  "bullet_next": 38220,
+-  "bullet_draw_all": 38231,
+-  "bullet_draw_loop": 38237,
+-  "bullet_draw_ix": 38250,
+-  "bullet_draw_with": 38253,
+-  "digit_bitmaps": 38280,
+-  "wave_initial": 38350,
+-  "wave_hunters": 38410,
+-  "wave_rush": 38470,
+-  "wave_cycle": 38530,
+-  "wave_repeat": 38531,
+-  "hunter_pair_active": 38532,
+-  "hunter_drift": 38533,
+-  "hunter_pair_turn": 38534,
+-  "hunter_pair_left_index": 38535,
+-  "hunter_attack_cooldown": 38536,
+-  "hunter_sway_bias": 38537,
+-  "hunter_target_left": 38538,
+-  "hunter_target_right": 38539,
+-  "hunter_slot_index": 38540,
+-  "ship_old_x": 38541,
+-  "ship_old_y": 38542,
+-  "ship_new_x": 38543,
+-  "ship_new_y": 38544,
+-  "ship_x": 38545,
+-  "ship_y": 38546,
+-  "fire_held": 38547,
+-  "player_respawn_pending": 38548,
+-  "kills": 38549,
+-  "wave_done": 38550,
+-  "wave_stage": 38551,
+-  "enemy_slots": 38552,
+-  "bullet_slots": 38612,
+-  "shield_init": 38618,
+-  "shield_irq_tick": 38679,
+-  "shield_irq_state": 38689,
+-  "shield_irq_segment_37": 38725,
+-  "shield_irq_segment_done": 38733,
+-  "shield_irq_store_sub": 38746,
+-  "shield_irq_expiry": 38749,
+-  "shield_irq_ready": 38775,
+-  "shield_try_activate": 38785,
+-  "shield_key_release": 38829,
+-  "shield_collisions": 38834,
+-  "shield_bird_loop": 38848,
+-  "shield_bird_next": 38906,
+-  "enemy_bullet_update": 38915,
+-  "enemy_bullet_move_loop": 38921,
+-  "eb_hitbox": 38965,
+-  "enemy_bullet_remove": 39004,
+-  "enemy_bullet_next": 39008,
+-  "enemy_fire_countdown": 39028,
+-  "enemy_fire_due": 39039,
+-  "enemy_fire_period": 39057,
+-  "enemy_fire_period_ok": 39073,
+-  "enemy_fire_period_set": 39074,
+-  "enemy_bullet_find": 39083,
+-  "enemy_bullet_free": 39097,
+-  "enemy_shooter_turn_ok": 39120,
+-  "enemy_shooter_offset": 39130,
+-  "enemy_shooter_start": 39134,
+-  "enemy_bullet_bird": 39141,
+-  "enemy_bullet_shooter_next": 39151,
+-  "enemy_shooter_no_wrap": 39168,
+-  "enemy_shooter_advance": 39173,
+-  "enemy_bullet_spawn": 39179,
+-  "boss_bullet_spawn": 39206,
+-  "boss_bullet_left": 39220,
+-  "enemy_bullet_draw_all": 39238,
+-  "enemy_bullet_draw_loop": 39244,
+-  "enemy_bullet_draw_next": 39251,
+-  "ship_hit_collisions": 39260,
+-  "ship_hit_bird_loop": 39282,
+-  "ship_hit_bird_next": 39346,
+-  "player_take_hit": 39355,
+-  "shield_color_unpaint": 39389,
+-  "shield_color_paint": 39394,
+-  "shield_color_apply": 39399,
+-  "shield_state": 39467,
+-  "shield_key_held": 39468,
+-  "shield_previous_state": 39469,
+-  "shield_frame_state": 39470,
+-  "shield_timer": 39471,
+-  "shield_charge_frame": 39473,
+-  "shield_meter": 39474,
+-  "shield_meter_displayed": 39475,
+-  "shield_ready_pending": 39476,
+-  "shield_invulnerable": 39477,
+-  "player_lives": 39478,
+-  "lives_displayed": 39479,
+-  "shield_outline_color": 39480,
+-  "shot_spawn_turn": 39481,
+-  "shot_shooter_index": 39482,
+-  "old_enemy_bullets": 39483,
+-  "enemy_bullet_slots": 39492,
+-  "boss_start": 39501,
+-  "boss_row": 39535,
+-  "boss_scene_sync": 39592,
+-  "boss_scene_screen_row": 39607,
+-  "boss_palette_white": 39644,
+-  "boss_palette_red": 39649,
+-  "boss_palette_apply": 39654,
+-  "boss_white_attr_row": 39665,
+-  "boss_white_attr_col": 39671,
+-  "boss_eye_tick": 39689,
+-  "boss_eye_apply": 39713,
+-  "boss_update": 39726,
+-  "boss_flash_red": 39753,
+-  "boss_erase_start": 39757,
+-  "boss_cycle_keep": 39800,
+-  "boss_phase_count_done": 39814,
+-  "boss_planet_install": 39830,
+-  "boss_planet_erase": 39844,
+-  "boss_planet_blit": 39851,
+-  "planet_bitmap_row": 39856,
+-  "planet_blank_row": 39897,
+-  "planet_blank_byte": 39900,
+-  "planet_next_row": 39904,
+-  "boss_planet_palette_cyan": 39916,
+-  "boss_planet_palette_white": 39921,
+-  "boss_planet_palette_apply": 39923,
+-  "planet_attr_row": 39934,
+-  "planet_attr_col": 39937,
+-  "planet_source": 39958,
+-  "planet_mode": 39960,
+-  "planet_y": 39961,
+-  "planet_ink": 39962,
+-  "boss_hp": 39963,
+-  "boss_death_left": 39964,
+-  "boss_ink": 39965,
+-  "boss_y": 39966,
+-  "boss_src": 39967,
+-  "beep_enemy_destroy": 39969,
+-  "beep_enemy_blip_cycle": 39971,
+-  "beep_enemy_blip_high": 39977,
+-  "beep_enemy_blip_low": 39984,
+-  "beep_player_death": 39990,
+-  "sfx_death_noise_burst": 39995,
+-  "sfx_death_noise_next": 39997,
+-  "beep_boss_destroy": 40017,
+-  "sfx_boss_rumble_outer": 40022,
+-  "sfx_boss_rumble_inner": 40024,
+-  "sprite_render": 40044,
+-  "spr_dest": 40098,
+-  "sprite_row2": 40123,
+-  "sprite_row2_n": 40154,
+-  "sprite_row3": 40157,
+-  "sprite_row3_n": 40193,
+-  "sprite_row4": 40196,
+-  "sprite_row4_n": 40237,
+-  "sprite_row5": 40240,
+-  "sprite_row5_n": 40286,
+-  "spr_data": 40289,
+-  "spr_x": 40291,
+-  "spr_y": 40292,
+-  "spr_cols": 40293,
+-  "spr_height": 40294,
+-  "compositor_init": 40295,
+-  "composite_setup": 40318,
+-  "composite_mul": 40336,
+-  "composite_skip": 40344,
+-  "sprite_fits": 40346,
+-  "sprite_fits_no": 40362,
+-  "sprite_restore": 40365,
+-  "rest_row2": 40396,
+-  "rest_row3": 40433,
+-  "rest_row4": 40472,
+-  "rest_row5": 40513,
+-  "sprite_present": 40556,
+-  "pres_row2": 40584,
+-  "pres_row3": 40621,
+-  "pres_row4": 40660,
+-  "pres_row5": 40701,
+-  "compositor_scrub": 40744,
+-  "scrub_row": 40749,
+-  "scrub_advance": 40784,
+-  "scrub_y": 40798,
+-  "scrub_rows_left": 40799,
+-  "stars_v13_init": 40800,
+-  "stars_v13_erase_old": 40812,
+-  "stars_v11_clear_loop": 40832,
+-  "stars_v11_sky_bit": 40869,
+-  "stars_v13_move": 40870,
+-  "stars_v13_move_loop": 40875,
+-  "stars_v13_rate_mid": 40900,
+-  "stars_v13_rate_slow": 40908,
+-  "stars_v13_move_wrap": 40912,
+-  "stars_v13_move_store": 40919,
+-  "stars_v13_select_bank": 40927,
+-  "stars_v13_select_first": 40954,
+-  "stars_v13_cache_rebuild": 40973,
+-  "stars_v13_cache_loop": 40983,
+-  "stars_v13_screen_addr": 41016,
+-  "stars_v13_cache_rebuild_half": 41042,
+-  "stars_v11_rebuild_loop": 41051,
+-  "stars_v13_masks_init": 41088,
+-  "stars_v13_mask_init_loop": 41098,
+-  "stars_v13_draw_all": 41126,
+-  "stars_v11_draw_loop": 41131,
+-  "stars_v13_present_all": 41145,
+-  "stars_v13_present_old": 41151,
+-  "stars_v13_present_new": 41159,
+-  "stars_v13_present_initial": 41167,
+-  "stars_v13_sync_loop": 41175,
+-  "stars_v13_active_stars": 41195,
+-  "stars_v13_active_cache": 41197,
+-  "stars_v13_active_previous": 41199,
+-  "stars_v13_cache": 41201,
+-  "stars_v13_previous": 41297,
+-  "arcade_screen_clear": 41393,
++  "title_pulse_times": 33410,
++  "title_pulse_countdown": 33414,
++  "title_pulse_phase": 33415,
++  "gameover_irq_tick": 33416,
++  "gameover_enter": 33432,
++  "gameover_tune": 33469,
++  "gameover_wait_3_seconds": 33475,
++  "gameover_wait_release": 33492,
++  "gameover_wait_press": 33500,
++  "gameover_screen_show": 33511,
++  "gameover_prompt_show": 33520,
++  "gameover_prompt_cell": 33527,
++  "gameover_score_draw": 33532,
++  "gameover_digit_draw": 33580,
++  "gameover_glyph_advance": 33596,
++  "gameover_glyph_found": 33599,
++  "gameover_digit_row": 33607,
++  "gameover_mode": 33652,
++  "gameover_timer": 33653,
++  "go_col": 33655,
++  "go_y": 33656,
++  "go_glyph": 33657,
++  "phase_interlude_enter": 33659,
++  "phase_interlude_wait": 33690,
++  "phase_screen_show": 33728,
++  "phase_number_draw": 33737,
++  "phase_divide10": 33742,
++  "phase_tens_done": 33751,
++  "phase_number": 33769,
++  "phase_units": 33770,
++  "combat_init": 33771,
++  "combat_tick": 33923,
++  "animation_wings_up": 34015,
++  "combat_last_death_freeze": 34043,
++  "color_shadow_init": 34112,
++  "color_shadow_present": 34124,
++  "color_old_pair_loop": 34136,
++  "color_old_pair_next": 34156,
++  "color_present_bullets": 34215,
++  "color_bullet_loop": 34217,
++  "color_bullet_next": 34241,
++  "color_present_shield_old": 34250,
++  "color_present_shield_new": 34265,
++  "color_present_shield": 34277,
++  "color_present_six": 34288,
++  "color_present_six_loop": 34292,
++  "color_present_enemy": 34305,
++  "color_present_ship": 34323,
++  "color_ship_width_ok": 34336,
++  "color_present_box": 34342,
++  "color_box_width_ok": 34366,
++  "color_box_height_ok": 34393,
++  "color_box_row5": 34452,
++  "color_box_row4": 34472,
++  "color_box_row3": 34490,
++  "color_box_row2": 34506,
++  "color_box_row1": 34520,
++  "color_box_next_row": 34532,
++  "color_rect_w": 34544,
++  "color_rect_h": 34545,
++  "color_col": 34546,
++  "color_row": 34547,
++  "wave_unpaint_old": 34548,
++  "wave_unpaint_loop": 34556,
++  "wave_paint_new": 34574,
++  "wave_paint_loop": 34582,
++  "paint_enemy_attr_ix": 34609,
++  "paint_enemy_rows": 34645,
++  "paint_enemy_cols": 34647,
++  "ship_attr_plot": 34661,
++  "ship_paint_cockpit": 34697,
++  "ship_paint_engines": 34731,
++  "player_unpaint_old": 34812,
++  "player_paint_new": 34842,
++  "player_paint_live": 34861,
++  "ship_attr_x": 34891,
++  "ship_attr_y": 34892,
++  "ship_attr_ink": 34893,
++  "player_paint_explosion": 34894,
++  "composite_update": 34911,
++  "composite_restore_old": 34948,
++  "co_re_e": 34956,
++  "co_re_enemy_b": 34974,
++  "co_re_b": 34992,
++  "composite_present_old": 35064,
++  "co_pre_b": 35070,
++  "co_pre_enemy_b": 35088,
++  "composite_present_new": 35104,
++  "co_prn_b": 35113,
++  "co_prn_enemy_b": 35131,
++  "composite_present_enemy_pairs": 35144,
++  "co_union_loop": 35156,
++  "comp_present_enemy_pair": 35171,
++  "co_changed": 35188,
++  "co_union_wide": 35273,
++  "co_union_y": 35280,
++  "co_old_x": 35302,
++  "co_present_fallback": 35303,
++  "co_present_new_only": 35306,
++  "comp_present_ship_union": 35318,
++  "cps_same_x": 35368,
++  "cps_right": 35382,
++  "cps_left": 35396,
++  "cps_y": 35407,
++  "cps_moved_up": 35431,
++  "comp_present_shield_pair": 35446,
++  "cps_fallback": 35504,
++  "comp_restore_enemy_ix": 35554,
++  "comp_present_enemy_ix": 35565,
++  "enemy_box_ix": 35576,
++  "enemy_unchanged": 35615,
++  "enemy_rect_ix": 35636,
++  "comp_restore_bullet_ix": 35655,
++  "comp_present_bullet_ix": 35673,
++  "bullet_rect_dest": 35688,
++  "enemy_palettes": 35722,
++  "old_anim_phase": 35726,
++  "anim_phase": 35727,
++  "draw_anim_phase": 35728,
++  "enemy_paint_color": 35729,
++  "old_enemy_slots": 35730,
++  "old_bullet_slots": 35790,
++  "combat_render": 35796,
++  "player_respawn_tick": 35846,
++  "player_draw": 35886,
++  "player_draw_live": 35909,
++  "player_flame_ready": 35953,
++  "player_draw_death": 36027,
++  "ship_blast_second": 36039,
++  "ship_blast_third": 36048,
++  "ship_blast_ready": 36051,
++  "player_keys": 36079,
++  "player_left_step": 36109,
++  "player_no_left": 36114,
++  "player_right_step": 36138,
++  "player_no_right": 36143,
++  "player_fire": 36147,
++  "player_fire_live": 36167,
++  "player_find_slot": 36197,
++  "player_slot_found": 36212,
++  "player_fire_release": 36236,
++  "wave_update": 36241,
++  "wave_advance_stage": 36277,
++  "wave_stage_store": 36295,
++  "wave_spawn": 36298,
++  "wave_spawn_now": 36301,
++  "wave_spawn_copy": 36320,
++  "wave_spawn_count": 36338,
++  "wave_update_live": 36365,
++  "wave_move_loop": 36385,
++  "wave_move_live": 36410,
++  "wave_speed_ready_v25": 36453,
++  "wave_end_bird": 36491,
++  "wave_rush_reenter": 36498,
++  "wave_rush_hover": 36513,
++  "wave_skip_vertical": 36542,
++  "wave_stage_clock_ready": 36566,
++  "wave_kamikaze_threshold": 36583,
++  "wave_steer_left": 36613,
++  "wave_curve_motion": 36626,
++  "wave_move_next": 36648,
++  "wave_check_live": 36671,
++  "wave_rush_regroup": 36683,
++  "wave_rush_scan": 36701,
++  "wave_rush_scan_next": 36720,
++  "wave_rush_check_clock": 36750,
++  "wave_rush_release_loop": 36767,
++  "wave_rush_release_next": 36779,
++  "rush_rest_irq_tick": 36787,
++  "rush_rest_ticks": 36797,
++  "rush_pause_active": 36798,
++  "rush_hover_found": 36799,
++  "led_anim_clock": 36800,
++  "led_anim_phase": 36801,
++  "hunter_wave_update": 36802,
++  "hunter_drift_store": 36835,
++  "hunter_check_pair_launch": 36838,
++  "hunter_try_launch_v25": 36852,
++  "hunter_after_launch_v25": 36862,
++  "hunter_w_loop": 36874,
++  "hunter_w_store_y": 36911,
++  "hunter_w_sway": 36914,
++  "hunter_w_explosion": 36945,
++  "hunter_w_dive": 36962,
++  "hunter_w_target_left": 36992,
++  "hunter_w_target_ready": 36995,
++  "hunter_w_approach_right": 37013,
++  "hunter_w_turnback": 37020,
++  "hunter_w_return": 37027,
++  "hunter_return_home_y_ok": 37041,
++  "hunter_w_return_y": 37059,
++  "hunter_w_rejoin": 37065,
++  "hunter_w_next": 37075,
++  "hunter_pair_launch": 37111,
++  "hunter_single_launch": 37143,
++  "hunter_single_find": 37153,
++  "hunter_single_ready": 37170,
++  "hunter_single_min_ok": 37186,
++  "hunter_single_max_ok": 37193,
++  "hunter_pair_try_row": 37206,
++  "hunter_pair_lower": 37221,
++  "hunter_pair_ready": 37227,
++  "hunter_target_min_ok": 37257,
++  "hunter_target_max_ok": 37264,
++  "hunter_left_slot_ready": 37296,
++  "hunter_pair_fire": 37314,
++  "hunter_fire_left_ready": 37350,
++  "hunter_single_fire": 37361,
++  "hunter_single_fire_slot": 37376,
++  "hunter_single_fire_ready": 37380,
++  "hunter_fire_one": 37383,
++  "hunter_fire_find": 37395,
++  "hunter_fire_spawn": 37410,
++  "hunter_pair_completion": 37437,
++  "hunter_left_check": 37462,
++  "hunter_single_completion": 37495,
++  "hunter_single_complete_slot": 37510,
++  "hunter_single_completion_check": 37514,
++  "crow_wave_update": 37533,
++  "crow_select_scout": 37551,
++  "crow_scout_selected": 37569,
++  "crow_wave_movement": 37573,
++  "crow_wave_loop": 37581,
++  "crow_move_across": 37629,
++  "crow_scout_dive": 37655,
++  "crow_scout_left": 37692,
++  "crow_scout_turn": 37705,
++  "crow_scout_return": 37712,
++  "crow_scout_home": 37735,
++  "crow_scout_joins": 37738,
++  "crow_explosion_tick": 37748,
++  "crow_wave_next": 37762,
++  "wave_draw": 37785,
++  "wave_draw_loop": 37799,
++  "enemy_draw_ix": 37812,
++  "enemy_kind_raptor": 37855,
++  "enemy_kind_falcon": 37871,
++  "enemy_kind_crow": 37887,
++  "crow_sprite_ready": 37899,
++  "enemy_draw_explosion": 37931,
++  "enemy_kind_ready": 37953,
++  "bullet_update": 37982,
++  "bullet_update_loop": 37988,
++  "bullet_continue": 38011,
++  "bullet_check_enemy": 38032,
++  "bullet_no_hit": 38090,
++  "bullet_check_done": 38103,
++  "bullet_check_boss": 38107,
++  "boss_bullet_hit_score": 38160,
++  "bullet_next": 38169,
++  "bullet_draw_all": 38180,
++  "bullet_draw_loop": 38186,
++  "bullet_draw_ix": 38199,
++  "bullet_draw_with": 38202,
++  "digit_bitmaps": 38229,
++  "wave_initial": 38299,
++  "wave_hunters": 38359,
++  "wave_rush": 38419,
++  "wave_cycle": 38479,
++  "wave_repeat": 38480,
++  "hunter_pair_active": 38481,
++  "hunter_drift": 38482,
++  "hunter_pair_turn": 38483,
++  "hunter_pair_left_index": 38484,
++  "hunter_attack_cooldown": 38485,
++  "hunter_sway_bias": 38486,
++  "hunter_target_left": 38487,
++  "hunter_target_right": 38488,
++  "hunter_slot_index": 38489,
++  "ship_old_x": 38490,
++  "ship_old_y": 38491,
++  "ship_new_x": 38492,
++  "ship_new_y": 38493,
++  "ship_x": 38494,
++  "ship_y": 38495,
++  "fire_held": 38496,
++  "player_respawn_pending": 38497,
++  "kills": 38498,
++  "wave_done": 38499,
++  "wave_stage": 38500,
++  "enemy_slots": 38501,
++  "bullet_slots": 38561,
++  "shield_init": 38567,
++  "shield_irq_tick": 38628,
++  "shield_irq_state": 38638,
++  "shield_irq_segment_37": 38674,
++  "shield_irq_segment_done": 38682,
++  "shield_irq_store_sub": 38695,
++  "shield_irq_expiry": 38698,
++  "shield_irq_ready": 38724,
++  "shield_try_activate": 38734,
++  "shield_key_release": 38778,
++  "shield_collisions": 38783,
++  "shield_bird_loop": 38797,
++  "shield_bird_next": 38855,
++  "enemy_bullet_update": 38864,
++  "enemy_bullet_move_loop": 38870,
++  "eb_hitbox": 38914,
++  "enemy_bullet_remove": 38953,
++  "enemy_bullet_next": 38957,
++  "enemy_fire_countdown": 38977,
++  "enemy_fire_due": 38988,
++  "enemy_fire_period": 39006,
++  "enemy_fire_period_ok": 39022,
++  "enemy_fire_period_set": 39023,
++  "enemy_bullet_find": 39032,
++  "enemy_bullet_free": 39046,
++  "enemy_shooter_turn_ok": 39069,
++  "enemy_shooter_offset": 39079,
++  "enemy_shooter_start": 39083,
++  "enemy_bullet_bird": 39090,
++  "enemy_bullet_shooter_next": 39100,
++  "enemy_shooter_no_wrap": 39117,
++  "enemy_shooter_advance": 39122,
++  "enemy_bullet_spawn": 39128,
++  "boss_bullet_spawn": 39155,
++  "boss_bullet_left": 39169,
++  "enemy_bullet_draw_all": 39187,
++  "enemy_bullet_draw_loop": 39193,
++  "enemy_bullet_draw_next": 39200,
++  "ship_hit_collisions": 39209,
++  "ship_hit_bird_loop": 39231,
++  "ship_hit_bird_next": 39295,
++  "player_take_hit": 39304,
++  "shield_color_unpaint": 39338,
++  "shield_color_paint": 39343,
++  "shield_color_apply": 39348,
++  "shield_state": 39416,
++  "shield_key_held": 39417,
++  "shield_previous_state": 39418,
++  "shield_frame_state": 39419,
++  "shield_timer": 39420,
++  "shield_charge_frame": 39422,
++  "shield_meter": 39423,
++  "shield_meter_displayed": 39424,
++  "shield_ready_pending": 39425,
++  "shield_invulnerable": 39426,
++  "player_lives": 39427,
++  "lives_displayed": 39428,
++  "shield_outline_color": 39429,
++  "shot_spawn_turn": 39430,
++  "shot_shooter_index": 39431,
++  "old_enemy_bullets": 39432,
++  "enemy_bullet_slots": 39441,
++  "boss_start": 39450,
++  "boss_row": 39481,
++  "boss_scene_sync": 39538,
++  "boss_scene_screen_row": 39553,
++  "boss_palette_white": 39590,
++  "boss_palette_red": 39595,
++  "boss_palette_apply": 39600,
++  "boss_white_attr_row": 39611,
++  "boss_white_attr_col": 39617,
++  "boss_eye_tick": 39635,
++  "boss_eye_apply": 39659,
++  "boss_update": 39672,
++  "boss_flash_red": 39699,
++  "boss_erase_start": 39703,
++  "boss_cycle_keep": 39746,
++  "boss_phase_count_done": 39760,
++  "boss_planet_install": 39773,
++  "boss_planet_erase": 39787,
++  "boss_planet_blit": 39794,
++  "planet_bitmap_row": 39799,
++  "planet_blank_row": 39840,
++  "planet_blank_byte": 39843,
++  "planet_next_row": 39847,
++  "boss_planet_palette_cyan": 39859,
++  "boss_planet_palette_white": 39864,
++  "boss_planet_palette_apply": 39866,
++  "planet_attr_row": 39877,
++  "planet_attr_col": 39880,
++  "planet_source": 39901,
++  "planet_mode": 39903,
++  "planet_y": 39904,
++  "planet_ink": 39905,
++  "boss_hp": 39906,
++  "boss_death_left": 39907,
++  "boss_ink": 39908,
++  "boss_y": 39909,
++  "boss_src": 39910,
++  "beep_enemy_destroy": 39912,
++  "beep_enemy_blip_cycle": 39914,
++  "beep_enemy_blip_high": 39920,
++  "beep_enemy_blip_low": 39927,
++  "beep_player_death": 39933,
++  "sfx_death_noise_burst": 39938,
++  "sfx_death_noise_next": 39940,
++  "beep_boss_destroy": 39960,
++  "sfx_boss_rumble_outer": 39965,
++  "sfx_boss_rumble_inner": 39967,
++  "sprite_render": 39987,
++  "spr_dest": 40041,
++  "sprite_row2": 40066,
++  "sprite_row2_n": 40097,
++  "sprite_row3": 40100,
++  "sprite_row3_n": 40136,
++  "sprite_row4": 40139,
++  "sprite_row4_n": 40180,
++  "sprite_row5": 40183,
++  "sprite_row5_n": 40229,
++  "spr_data": 40232,
++  "spr_x": 40234,
++  "spr_y": 40235,
++  "spr_cols": 40236,
++  "spr_height": 40237,
++  "compositor_init": 40238,
++  "composite_setup": 40261,
++  "composite_mul": 40279,
++  "composite_skip": 40287,
++  "sprite_fits": 40289,
++  "sprite_fits_no": 40305,
++  "sprite_restore": 40308,
++  "rest_row2": 40339,
++  "rest_row3": 40376,
++  "rest_row4": 40415,
++  "rest_row5": 40456,
++  "sprite_present": 40499,
++  "pres_row2": 40527,
++  "pres_row3": 40564,
++  "pres_row4": 40603,
++  "pres_row5": 40644,
++  "compositor_scrub": 40687,
++  "scrub_row": 40692,
++  "scrub_advance": 40727,
++  "scrub_y": 40741,
++  "scrub_rows_left": 40742,
++  "stars_v13_init": 40743,
++  "stars_v13_erase_old": 40755,
++  "stars_v11_clear_loop": 40775,
++  "stars_v11_sky_bit": 40812,
++  "stars_v13_move": 40813,
++  "stars_v13_move_loop": 40818,
++  "stars_v13_rate_mid": 40843,
++  "stars_v13_rate_slow": 40851,
++  "stars_v13_move_wrap": 40855,
++  "stars_v13_move_store": 40862,
++  "stars_v13_select_bank": 40870,
++  "stars_v13_select_first": 40897,
++  "stars_v13_cache_rebuild": 40916,
++  "stars_v13_cache_loop": 40926,
++  "stars_v13_screen_addr": 40959,
++  "stars_v13_cache_rebuild_half": 40985,
++  "stars_v11_rebuild_loop": 40994,
++  "stars_v13_masks_init": 41031,
++  "stars_v13_mask_init_loop": 41041,
++  "stars_v13_draw_all": 41069,
++  "stars_v11_draw_loop": 41074,
++  "stars_v13_present_all": 41088,
++  "stars_v13_present_old": 41094,
++  "stars_v13_present_new": 41102,
++  "stars_v13_present_initial": 41110,
++  "stars_v13_sync_loop": 41118,
++  "stars_v13_active_stars": 41138,
++  "stars_v13_active_cache": 41140,
++  "stars_v13_active_previous": 41142,
++  "stars_v13_cache": 41144,
++  "stars_v13_previous": 41192,
++  "arcade_screen_clear": 41240,
+   "input_bits": 61456,
+   "kempston_ok": 61457,
+   "kempston_mode": 61458,
+@@ -627,54 +615,54 @@
+   "boss_eye": 61467,
+   "card_len": 40,
+   "tick_frames": 2,
+-  "input_poll": 41421,
+-  "ip_q": 41441,
+-  "ip_space": 41450,
+-  "ip_sinclair": 41459,
+-  "ip_s9": 41471,
+-  "ip_s8": 41477,
+-  "ip_s7": 41483,
+-  "ip_s6": 41489,
+-  "ip_kempston": 41495,
+-  "ip_store": 41507,
+-  "tick_wait": 41512,
+-  "tick_wait_loop": 41516,
+-  "tick_go": 41529,
+-  "grace_irq_tick": 41539,
+-  "v11_boot_clear": 41549,
+-  "fire_period_first": 41568,
+-  "fire_period_later": 41572,
+-  "score_add_kill": 41576,
+-  "sak_counted": 41599,
+-  "sak_reset": 41627,
+-  "sak_store": 41628,
+-  "score_to_digits": 41634,
+-  "sd_div": 41669,
+-  "sd_loop": 41671,
+-  "sd_done": 41679,
+-  "wave_card_start": 41682,
+-  "wave_card_tick": 41714,
+-  "card_draw": 41724,
+-  "wct_loop": 41736,
+-  "wave_card_end": 41771,
+-  "wce_row": 41776,
+-  "wce_col": 41780,
+-  "wave_card_attr": 41808,
+-  "wca_loop": 41813,
+-  "card_attr_present": 41818,
+-  "card_glyph": 41830,
+-  "cg_row": 41834,
+-  "card_glyphs": 41847,
+-  "glyph_o": 41861,
+-  "glyph_l": 41868,
+-  "glyph_e": 41875,
+-  "glyph_a": 41882,
+-  "glyph_d": 41889,
+-  "glyph_sp": 41896,
+-  "pause_check": 41903,
+-  "pc_down": 41917,
+-  "pc_wait_release": 41937,
+-  "pc_wait_press": 41947,
++  "input_poll": 41268,
++  "ip_q": 41288,
++  "ip_space": 41297,
++  "ip_sinclair": 41306,
++  "ip_s9": 41318,
++  "ip_s8": 41324,
++  "ip_s7": 41330,
++  "ip_s6": 41336,
++  "ip_kempston": 41342,
++  "ip_store": 41354,
++  "tick_wait": 41359,
++  "tick_wait_loop": 41363,
++  "tick_go": 41376,
++  "grace_irq_tick": 41386,
++  "v11_boot_clear": 41396,
++  "fire_period_first": 41415,
++  "fire_period_later": 41419,
++  "score_add_kill": 41423,
++  "sak_counted": 41446,
++  "sak_reset": 41474,
++  "sak_store": 41475,
++  "score_to_digits": 41481,
++  "sd_div": 41516,
++  "sd_loop": 41518,
++  "sd_done": 41526,
++  "wave_card_start": 41529,
++  "wave_card_tick": 41561,
++  "card_draw": 41571,
++  "wct_loop": 41583,
++  "wave_card_end": 41618,
++  "wce_row": 41623,
++  "wce_col": 41627,
++  "wave_card_attr": 41655,
++  "wca_loop": 41660,
++  "card_attr_present": 41665,
++  "card_glyph": 41677,
++  "cg_row": 41681,
++  "card_glyphs": 41694,
++  "glyph_o": 41708,
++  "glyph_l": 41715,
++  "glyph_e": 41722,
++  "glyph_a": 41729,
++  "glyph_d": 41736,
++  "glyph_sp": 41743,
++  "pause_check": 41750,
++  "pc_down": 41764,
++  "pc_wait_release": 41784,
++  "pc_wait_press": 41794,
+   "hud_buf": 61488,
+   "hp_addr": 61504,
+   "hp_stride": 61506,
+@@ -683,12 +671,6 @@
+   "hud_tmp": 61512,
+   "face_k": 61513,
+   "enemy_count": 61611,
+-  "bg_x": 61612,
+-  "bg_y": 61613,
+-  "bg_src": 61614,
+-  "bg_lines": 61616,
+-  "bg_k": 61617,
+-  "bg_lv": 61618,
+   "snd_idle": 61620,
+   "snd_budget": 61622,
+   "snd_mid_ok": 61624,
+@@ -706,44 +688,44 @@
+   "moon_clock": 61609,
+   "blk_col": 61610,
+   "moon_y": 113,
+-  "hud_put": 41970,
+-  "hud_put_row": 41981,
+-  "hud_draw_all": 42010,
+-  "score_draw": 42033,
+-  "score_big_loop": 42064,
+-  "record_draw": 42108,
+-  "record_pair_loop": 42116,
+-  "nibble_pair": 42149,
+-  "nibble_left": 42158,
+-  "nibble_right": 42178,
+-  "nibble_addr": 42186,
+-  "shield_bar_present": 42199,
+-  "shield_bar_redraw": 42218,
+-  "shield_bar_col": 42244,
+-  "shield_text": 42294,
+-  "shield_text_col": 42306,
+-  "shield_text_attr": 42330,
+-  "hud_attr_sync": 42343,
+-  "has_row": 42351,
+-  "shield_colors_ready": 42367,
+-  "shield_colors_active": 42373,
+-  "shield_colors_charge": 42379,
+-  "record_digits": 42385,
+-  "digits6_draw": 42421,
+-  "digits_n_draw": 42426,
+-  "digits6_loop": 42429,
++  "hud_put": 41817,
++  "hud_put_row": 41828,
++  "hud_draw_all": 41857,
++  "score_draw": 41880,
++  "score_big_loop": 41911,
++  "record_draw": 41955,
++  "record_pair_loop": 41963,
++  "nibble_pair": 41996,
++  "nibble_left": 42005,
++  "nibble_right": 42025,
++  "nibble_addr": 42033,
++  "shield_bar_present": 42046,
++  "shield_bar_redraw": 42065,
++  "shield_bar_col": 42091,
++  "shield_text": 42141,
++  "shield_text_col": 42153,
++  "shield_text_attr": 42177,
++  "hud_attr_sync": 42190,
++  "has_row": 42198,
++  "shield_colors_ready": 42214,
++  "shield_colors_active": 42220,
++  "shield_colors_charge": 42226,
++  "record_digits": 42232,
++  "digits6_draw": 42268,
++  "digits_n_draw": 42273,
++  "digits6_loop": 42276,
+   "new_record": 61518,
+   "record_start": 61538,
+-  "score_digits6": 42466,
+-  "lives_hud_present": 42488,
+-  "lives_face_loop": 42505,
+-  "lives_face_ready": 42534,
+-  "explosion_shift_init": 42608,
+-  "esi_frame": 42616,
+-  "esi_phase0": 42619,
+-  "esi_phase": 42634,
+-  "esi_prev": 42643,
+-  "esi_row": 42646,
++  "score_digits6": 42313,
++  "lives_hud_present": 42335,
++  "lives_face_loop": 42352,
++  "lives_face_ready": 42381,
++  "explosion_shift_init": 42455,
++  "esi_frame": 42463,
++  "esi_phase0": 42466,
++  "esi_phase": 42481,
++  "esi_prev": 42490,
++  "esi_row": 42493,
+   "snd_ear": 61520,
+   "snd_seg": 61521,
+   "snd_hp": 61523,
+@@ -757,95 +739,105 @@
+   "mus_note": 61533,
+   "mus_loop": 61534,
+   "snd_play_mode": 61536,
+-  "sfx_start": 42673,
+-  "sfx_take": 42686,
+-  "sfx_load": 42691,
+-  "sfx_end": 42723,
+-  "snd_tick": 42731,
+-  "snd_sweep": 42747,
+-  "snd_sweep_add": 42758,
+-  "snd_slice": 42766,
+-  "tone_until_irq": 42787,
+-  "tone_half": 42794,
+-  "snd_half": 42818,
+-  "tone_noise_ok": 42832,
+-  "tone_square": 42839,
+-  "tone_out": 42844,
+-  "tone_delay": 42851,
+-  "snd_rest": 42857,
+-  "snd_rest_loop": 42858,
+-  "snd_rest_end": 42875,
+-  "snd_mid": 42877,
+-  "snd_mid_loop": 42920,
+-  "snd_mid_end": 42939,
+-  "music_start": 42942,
+-  "music_stop": 42954,
+-  "music_frame": 42965,
+-  "music_note": 42995,
+-  "music_play": 43007,
+-  "music_end": 43036,
+-  "music_rest": 43039,
+-  "sfx_shot": 43046,
+-  "sfx_enemy_fire": 43052,
+-  "sfx_boss_fire": 43058,
+-  "sfx_explode": 43064,
+-  "sfx_boss_hit": 43070,
+-  "sfx_shield_on": 43087,
+-  "sfx_shield_ready": 43093,
+-  "sfx_life": 43099,
+-  "sfx_card": 43105,
+-  "sfx_siren": 43111,
+-  "fx_shot": 43117,
+-  "fx_enemy_fire": 43130,
+-  "fx_boss_fire": 43138,
+-  "fx_explode": 43151,
+-  "fx_boss_hit": 43164,
+-  "fx_boss_hit_low": 43177,
+-  "fx_shield_on": 43190,
+-  "fx_shield_ready": 43203,
+-  "fx_life": 43221,
+-  "fx_card": 43244,
+-  "fx_siren": 43272,
+-  "scanline_table": 43305,
+-  "bitmask_table": 43689,
+-  "player_phase_ptrs": 43697,
+-  "enemy_needle_phase_ptrs": 43713,
+-  "enemy_needle_phase_ptrs_f1": 43729,
+-  "enemy_blade_phase_ptrs": 43745,
+-  "enemy_blade_phase_ptrs_f1": 43761,
+-  "enemy_drone_phase_ptrs": 43777,
+-  "enemy_drone_phase_ptrs_f1": 43793,
+-  "shot_phase_ptrs": 43809,
+-  "explosion_phase_ptrs": 43825,
+-  "wave_sinus": 43841,
+-  "crow_phase_ptrs": 43905,
+-  "crow_phase_ptrs_f1": 43921,
+-  "ship_blast_phase_ptrs_f0": 43937,
+-  "ship_blast_phase_ptrs_f1": 43953,
+-  "ship_blast_phase_ptrs_f2": 43969,
+-  "shield_phase_ptrs": 43985,
+-  "title_lz": 44001,
+-  "phase_lz": 46685,
+-  "hud_lz": 47649,
+-  "hud_big_digits": 48385,
+-  "hud_nibble_digits": 48465,
+-  "hud_s5_digits": 48515,
+-  "hud_face_feliz": 48565,
+-  "hud_face_apurado": 48591,
+-  "hud_face_vacia": 48617,
+-  "hud_shield_rows": 48643,
+-  "hud_txt_listo": 48697,
+-  "hud_txt_activo": 48727,
+-  "hud_txt_carga": 48757,
++  "snd_shortf": 61627,
++  "snd_burst": 61628,
++  "snd_burst_len": 700,
++  "sfx_start": 42520,
++  "sfx_take": 42533,
++  "sfx_load": 42538,
++  "sfx_end": 42578,
++  "snd_tick": 42586,
++  "snd_sweep": 42602,
++  "snd_sweep_add": 42613,
++  "snd_burst_reset": 42620,
++  "snd_burst_use": 42627,
++  "snd_burst_out": 42645,
++  "snd_burst_keep": 42649,
++  "snd_slice": 42655,
++  "burst_half": 42680,
++  "tone_until_irq": 42710,
++  "tone_half": 42717,
++  "snd_half": 42741,
++  "tone_noise_ok": 42755,
++  "tone_square": 42762,
++  "tone_out": 42767,
++  "tone_delay": 42774,
++  "snd_rest": 42780,
++  "snd_rest_loop": 42781,
++  "snd_rest_end": 42798,
++  "snd_mid": 42800,
++  "snd_mid_loop": 42836,
++  "snd_mid_go": 42847,
++  "snd_mid_zero": 42866,
++  "snd_mid_end": 42869,
++  "music_start": 42886,
++  "music_stop": 42898,
++  "music_frame": 42909,
++  "music_note": 42939,
++  "music_play": 42951,
++  "music_end": 42980,
++  "music_rest": 42983,
++  "sfx_shot": 42990,
++  "sfx_enemy_fire": 42996,
++  "sfx_boss_fire": 43002,
++  "sfx_explode": 43008,
++  "sfx_boss_hit": 43014,
++  "sfx_shield_on": 43031,
++  "sfx_shield_ready": 43037,
++  "sfx_life": 43043,
++  "sfx_card": 43049,
++  "sfx_siren": 43055,
++  "fx_shot": 43061,
++  "fx_enemy_fire": 43074,
++  "fx_boss_fire": 43082,
++  "fx_explode": 43095,
++  "fx_boss_hit": 43108,
++  "fx_boss_hit_low": 43121,
++  "fx_shield_on": 43134,
++  "fx_shield_ready": 43147,
++  "fx_life": 43165,
++  "fx_card": 43188,
++  "fx_siren": 43216,
++  "scanline_table": 43249,
++  "bitmask_table": 43633,
++  "player_phase_ptrs": 43641,
++  "enemy_needle_phase_ptrs": 43657,
++  "enemy_needle_phase_ptrs_f1": 43673,
++  "enemy_blade_phase_ptrs": 43689,
++  "enemy_blade_phase_ptrs_f1": 43705,
++  "enemy_drone_phase_ptrs": 43721,
++  "enemy_drone_phase_ptrs_f1": 43737,
++  "shot_phase_ptrs": 43753,
++  "explosion_phase_ptrs": 43769,
++  "wave_sinus": 43785,
++  "crow_phase_ptrs": 43849,
++  "crow_phase_ptrs_f1": 43865,
++  "ship_blast_phase_ptrs_f0": 43881,
++  "ship_blast_phase_ptrs_f1": 43897,
++  "ship_blast_phase_ptrs_f2": 43913,
++  "shield_phase_ptrs": 43929,
++  "title_lz": 43945,
++  "phase_lz": 46629,
++  "hud_lz": 47593,
++  "hud_big_digits": 48329,
++  "hud_nibble_digits": 48409,
++  "hud_s5_digits": 48459,
++  "hud_face_feliz": 48509,
++  "hud_face_apurado": 48535,
++  "hud_face_vacia": 48561,
++  "hud_shield_rows": 48587,
++  "hud_txt_listo": 48641,
++  "hud_txt_activo": 48671,
++  "hud_txt_carga": 48701,
+   "frame_bitmap_low": 29888,
+-  "enemy_shot_phase_ptrs": 48787,
+-  "flame_phase_ptrs_f0": 48803,
+-  "flame_phase_ptrs_f1": 48819,
++  "enemy_shot_phase_ptrs": 48731,
++  "flame_phase_ptrs_f0": 48747,
++  "flame_phase_ptrs_f1": 48763,
+   "explosion_src": 30336,
+-  "explosion_phase_ptrs_f0": 48835,
+-  "explosion_phase_ptrs_f1": 48851,
+-  "explosion_phase_ptrs_f2": 48867,
+-  "title_star_cells": 48883,
++  "explosion_phase_ptrs_f0": 48779,
++  "explosion_phase_ptrs_f1": 48795,
++  "explosion_phase_ptrs_f2": 48811,
++  "title_star_cells": 48827,
+   "title_star_count": 36,
+-  "frame_attr_data": 48955
++  "frame_attr_data": 48899
+ }
+\ No newline at end of file
+diff -ruN -x __pycache__ -x '*.tap' -x '*.png' -x '*.bin' -x '*.scr' -x '*.gif' -x 'CAMBIOS_V1_3*.patch' HALCONES_ESTELARES_CODIGO_FUENTE_1_3_2/build/v12_fondos.asm hal/build/v12_fondos.asm
+--- HALCONES_ESTELARES_CODIGO_FUENTE_1_3_2/build/v12_fondos.asm	2026-11-12 12:18:42.868461825 +0100
++++ hal/build/v12_fondos.asm	1970-01-01 01:00:00.000000000 +0100
+@@ -1,16 +0,0 @@
+-; V1.2 fondos de fase (generado por tools/v12_fondos.py)
+-bg_patterns:
+- db 0,0,0,0,8,0,2,0,10,0,5,0,10,5,10,5
+-bg_0:
+- db 13,88
+- db 0,0,80,0,0,0,21,80,85,0,0,84,85,144,64,5,101,169,85,80,21,106,185,105,80,21,127,170,185,80,11,190,127,169,80,95,175,254,106,80,90,175,238,189,0,91,255,175,233,16,91,235,255,153,80,170,175,234,154,0,150,255,219,165,0,86,230,171,145,0,106,166,229,65,0,84,170,145,80,0
+-bg_1:
+- db 3,88
+- db 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,85,64,0,1,106,85,85,0,5,186,80,0,0,5,174,80,0,85,85,169,64,0,1,85,64,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+-bg_2:
+- db 13,88
+- db 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,42,0,0,0,2,170,144,0,0,10,170,148,0,0,170,170,150,128,42,42,170,149,42,168,42,170,85,10,42,42,170,85,42,0,170,165,106,128,0,6,149,84,0,0,1,85,80,0,0,0,21,0,0,0,0,0,0,0,0,0,0,0,0
+-bg_3:
+- db 4,88
+- db 0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,65,0,0,0,0,4,16,0,0,0,17,85,80,0,4,5,85,84,0,0,21,106,84,0,0,5,174,148,0,0,21,106,85,0,1,5,85,84,0,0,1,85,80,0,0,1,0,64,0,0,1,4,0,0,0,0,0,0,0,0,0,0,0,0
+-bg_table: dw bg_0,bg_1,bg_2,bg_3
+diff -ruN -x __pycache__ -x '*.tap' -x '*.png' -x '*.bin' -x '*.scr' -x '*.gif' -x 'CAMBIOS_V1_3*.patch' HALCONES_ESTELARES_CODIGO_FUENTE_1_3_2/build.py hal/build.py
+--- HALCONES_ESTELARES_CODIGO_FUENTE_1_3_2/build.py	2026-11-12 02:24:03.707633188 +0100
++++ hal/build.py	2026-11-12 17:16:56.661097514 +0100
+@@ -19,7 +19,7 @@
+ # V1.1: rutinas frias en memoria baja, a continuacion de los sprites reubicados.
+ # Dos ensamblados enlazados por direcciones absolutas (solo JP/CALL entre ellos).
+ import re as _re
+-low_src=(R/'src/v11_bajo.asm').read_text()+'\n'+(R/'src/v12_bajo.asm').read_text()+'\n'+(R/'build/v12_fondos.asm').read_text()
++low_src=(R/'src/v11_bajo.asm').read_text()+'\n'+(R/'src/v12_bajo.asm').read_text()
+ low_bin_sprites=(R/'build/sprites_reloc_v22.bin').read_bytes()
+ LOW_ORG=0x6000+len(low_bin_sprites)
+ low_names=[m[1] for m in _re.finditer(r'^([a-z_0-9]+):',low_src,_re.M)]
+diff -ruN -x __pycache__ -x '*.tap' -x '*.png' -x '*.bin' -x '*.scr' -x '*.gif' -x 'CAMBIOS_V1_3*.patch' HALCONES_ESTELARES_CODIGO_FUENTE_1_3_2/src/boss_moai_v19.asm hal/src/boss_moai_v19.asm
+--- HALCONES_ESTELARES_CODIGO_FUENTE_1_3_2/src/boss_moai_v19.asm	2026-11-12 02:24:43.387278247 +0100
++++ hal/src/boss_moai_v19.asm	2026-11-12 17:16:56.660557228 +0100
+@@ -8,7 +8,6 @@
+  ld a,18                    ; 18 player shot hits to defeat boss (prototype balance).
+  ld (boss_hp),a
+  call boss_v12_start        ; V1.2: grietas, boca, derrumbe y luna a cero.
+- call bg_clear              ; V1.2: el MOAI y Jupiter ocupan el cielo sin fondo.
+  ld a,8
+  ld (boss_death_left),a  ; Short red/white destruction flash on defeat.
+  xor a
+@@ -182,7 +181,6 @@
+  inc a
+  ld (phase_number),a
+ boss_phase_count_done:
+- call bg_draw               ; V1.2: fondo de la fase nueva (se ve al volver).
+  call phase_interlude_enter ; Black screen, 150 real IM2 ticks, automatic return.
+  xor a
+  ld (wave_stage),a       ; Start next circuit with CROW.
+diff -ruN -x __pycache__ -x '*.tap' -x '*.png' -x '*.bin' -x '*.scr' -x '*.gif' -x 'CAMBIOS_V1_3*.patch' HALCONES_ESTELARES_CODIGO_FUENTE_1_3_2/src/gameplay.asm hal/src/gameplay.asm
+--- HALCONES_ESTELARES_CODIGO_FUENTE_1_3_2/src/gameplay.asm	2026-11-12 03:20:19.507687750 +0100
++++ hal/src/gameplay.asm	2026-11-12 17:16:56.659382242 +0100
+@@ -59,8 +59,7 @@
+  call shield_init          ; V1.8: arm real-time shield, lives and enemy projectiles.
+  call color_shadow_init      ; Snapshot current VRAM color attrs into private 768-byte RAM plane.
+  call led_frame_apply        ; Only the upper warning lamp begins BRIGHT; other two start dim.
+- call bg_draw                ; V1.2: fondo lejano de la fase 1 en el cielo...
+- call boss_scene_sync        ; ...y en la imagen de trabajo y la pantalla.
++ call boss_scene_sync        ; Cielo inmovil -> imagen de trabajo y pantalla.
+  call wave_card_start        ; V1.1: cartel OLEADA 1 (tras copiar los atributos).
+  jp hud_draw_all             ; V1.2: marcador completo con los valores de la partida nueva.
+ 
+diff -ruN -x __pycache__ -x '*.tap' -x '*.png' -x '*.bin' -x '*.scr' -x '*.gif' -x 'CAMBIOS_V1_3*.patch' HALCONES_ESTELARES_CODIGO_FUENTE_1_3_2/src/main.asm hal/src/main.asm
+--- HALCONES_ESTELARES_CODIGO_FUENTE_1_3_2/src/main.asm	2026-11-12 02:12:06.488838133 +0100
++++ hal/src/main.asm	2026-11-12 17:16:33.214699587 +0100
+@@ -6,6 +6,10 @@
+ enemy_bytes equ 60
+ bullet_n equ 2             ; V1.2: como mucho 2 balas propias a la vez (al estilo Galaga)
+ bullet_bytes equ 6
++star_n equ 16               ; V1.3.3: estrellas (antes 32)
++star_half equ 8             ; las que se mueven en cada tick
++star_bytes equ 48           ; star_n * 3
++star_half_bytes equ 24      ; star_half * 3
+ org 0x8000
+ entry:
+  di
+@@ -177,14 +181,12 @@
+ ; stars_v13_* are the only active star routines.
+ 
+ stars:
+- db 21,6,0, 29,42,1, 25,19,2, 36,113,0
+- db 47,67,1, 53,150,2, 64,33,0, 72,92,1
+- db 80,12,2, 91,41,0, 108,120,1, 116,25,2
+- db 123,72,0, 137,173,1, 142,58,2, 153,7,0
+- db 163,125,1, 174,87,2, 185,18,0, 28,178,1
+- db 44,3,2, 60,183,0, 76,142,1, 95,95,2
+- db 113,179,0, 132,132,1, 150,161,2, 169,50,0
+- db 182,166,1, 33,84,2, 106,6,0, 30,163,1
++ ; V1.3.3: 16 estrellas (antes 32) para dar ese tiempo al sonido; dos bancos
++ ; de 8 que se mueven en ticks alternos, con los mismos tres ritmos.
++ db 21,6,0, 25,19,2, 47,67,1, 64,33,0
++ db 80,12,2, 108,120,1, 123,72,0, 142,58,2
++ db 163,125,1, 185,18,0, 44,3,2, 76,142,1
++ db 113,179,0, 150,161,2, 182,166,1, 106,6,0
+ 
+ hud_source: dw 0
+ hud_y: db 0
+diff -ruN -x __pycache__ -x '*.tap' -x '*.png' -x '*.bin' -x '*.scr' -x '*.gif' -x 'CAMBIOS_V1_3*.patch' HALCONES_ESTELARES_CODIGO_FUENTE_1_3_2/src/stars_scroll_v13.asm hal/src/stars_scroll_v13.asm
+--- HALCONES_ESTELARES_CODIGO_FUENTE_1_3_2/src/stars_scroll_v13.asm	2026-11-12 01:46:39.196012483 +0100
++++ hal/src/stars_scroll_v13.asm	2026-11-12 17:16:36.925442928 +0100
+@@ -1,4 +1,4 @@
+-; ESF V1.3 optimized 32-star parallax, Z80 standard assembly, ORG set by main.asm.
++; ESF V1.3 optimized star parallax (V1.3.3: 16 estrellas, star_n), Z80 standard assembly, ORG set by main.asm.
+ ; Runtime cache records: physical screen address LO/HI + mask (3 bytes/star).
+ ; Single address calculation per star/update instead of four per update.
+ ; Bounded to x<192, y<192, separate immutable sky plane at $D800.
+@@ -14,12 +14,12 @@
+  call stars_v13_select_bank    ; Work on alternating 16-star slices per update.
+  ld hl,(stars_v13_active_cache) ; V1.1: solo se guarda la mitad que se mueve
+  ld de,(stars_v13_active_previous) ; (la otra mitad no cambia este tick).
+- ld bc,48
++ ld bc,star_half_bytes
+  ldir
+  ; V1.1: borrado especializado de las 16 estrellas que se mueven: quita su bit
+  ; de la imagen de trabajo y repone ese bit del cielo inmutable (planeta/MOAI).
+  ld hl,(stars_v13_active_cache)
+- ld b,16
++ ld b,star_half
+ stars_v11_clear_loop:
+  ld e,(hl)
+  inc hl
+@@ -54,7 +54,7 @@
+ 
+ stars_v13_move:
+  ld hl,(stars_v13_active_stars) ; HL=first record of selected 16-star slice.
+- ld b,16                       ; Move only 16 stars this tick, alternating banks.
++ ld b,star_half                ; Move only half stars this tick, alternating banks.
+ stars_v13_move_loop:
+  push bc                        ; Save record loop count.
+  inc hl                         ; HL -> mutable Y.
+@@ -96,11 +96,11 @@
+  ld a,(frame_index)            ; Global game tick counter.
+  and 1                         ; Alternate two banks.
+  jp z,stars_v13_select_first  ; 0 selects first 16-star block.
+- ld hl,stars+48               ; Second group begins 16*3 bytes later.
++ ld hl,stars+star_half_bytes               ; Second group begins 16*3 bytes later.
+  ld (stars_v13_active_stars),hl ; Save data pointer.
+- ld hl,stars_v13_cache+48      ; Second half of current cache.
++ ld hl,stars_v13_cache+star_half_bytes      ; Second half of current cache.
+  ld (stars_v13_active_cache),hl ; Save cache pointer.
+- ld hl,stars_v13_previous+48   ; Second half of old cache.
++ ld hl,stars_v13_previous+star_half_bytes   ; Second half of old cache.
+  ld (stars_v13_active_previous),hl ; Save previous pointer.
+  ret                            ; Bank selection complete.
+ stars_v13_select_first:
+@@ -117,7 +117,7 @@
+ stars_v13_cache_rebuild:
+  ld ix,stars                  ; IX walks 32 records (X,Y,rate).
+  ld iy,stars_v13_cache        ; IY walks 32 screen_addr/bitmask records.
+- ld b,32                      ; B=star count.
++ ld b,star_n                  ; B=star count.
+ stars_v13_cache_loop:
+  push bc                       ; Save star count during address lookup.
+  ld a,(ix+0)                  ; Read X from star data.
+@@ -161,7 +161,7 @@
+  ; V1.1: misma direccion que stars_v13_screen_addr, sin IX/IY ni variables.
+  ld hl,(stars_v13_active_stars) ; HL = registros (x,y,ritmo) de las 16 que se mueven.
+  ld de,(stars_v13_active_cache) ; DE = sus direcciones en la cache.
+- ld b,16
++ ld b,star_half
+ stars_v11_rebuild_loop:
+  ld c,(hl)                      ; C = X
+  inc hl
+@@ -201,7 +201,7 @@
+ stars_v13_masks_init:
+  ld ix,stars                   ; IX iterates immutable star X/Y/rate records.
+  ld iy,stars_v13_cache         ; IY iterates 3-byte cache records.
+- ld b,32                       ; 32 star masks.
++ ld b,star_n                   ; star masks.
+ stars_v13_mask_init_loop:
+  push bc                        ; Preserve loop counter.
+  ld a,(ix+0)                   ; Star X coordinate.
+@@ -225,7 +225,7 @@
+ stars_v13_draw_all:
+  ; V1.1: bucle OR especializado (sin modo ni PUSH/POP por estrella).
+  ld hl,stars_v13_cache
+- ld b,32
++ ld b,star_n
+ stars_v11_draw_loop:
+  ld e,(hl)
+  inc hl
+@@ -247,15 +247,15 @@
+  jp stars_v13_present_new      ; Display current stars from work buffer.
+ stars_v13_present_old:
+  ld hl,(stars_v13_active_previous) ; Previous 16 moved-star addresses.
+- ld b,16                         ; Only this bank moved this tick.
++ ld b,star_half                  ; Only this bank moved this tick.
+  jp stars_v13_sync_loop          ; Sync completed bytes.
+ stars_v13_present_new:
+  ld hl,(stars_v13_active_cache) ; Current 16 moved-star addresses.
+- ld b,16                         ; Other 16 unchanged; actor rects repaint as needed.
++ ld b,star_half                  ; Other half unchanged; actor rects repaint as needed.
+  jp stars_v13_sync_loop          ; Sync completed bytes.
+ stars_v13_present_initial:
+  ld hl,stars_v13_cache          ; All 32 current positions after initialization.
+- ld b,32                         ; Initial display requires all stars.
++ ld b,star_n                     ; Initial display requires all stars.
+  jp stars_v13_sync_loop          ; Sync first still frame.
+ stars_v13_sync_loop:
+  push bc                       ; Preserve outer counter, LDI changes BC.
+@@ -279,5 +279,5 @@
+ stars_v13_active_stars: dw 0    ; Pointer to selected 16 star records.
+ stars_v13_active_cache: dw 0    ; Pointer to selected 16 cached addresses.
+ stars_v13_active_previous: dw 0 ; Pointer to previous selected cached addresses.
+-stars_v13_cache: ds 96      ; 32 records of current video address and bitmask.
+-stars_v13_previous: ds 96   ; 32 records of old video address and bitmask.
++stars_v13_cache: ds star_bytes      ; 32 records of current video address and bitmask.
++stars_v13_previous: ds star_bytes   ; 32 records of old video address and bitmask.
+diff -ruN -x __pycache__ -x '*.tap' -x '*.png' -x '*.bin' -x '*.scr' -x '*.gif' -x 'CAMBIOS_V1_3*.patch' HALCONES_ESTELARES_CODIGO_FUENTE_1_3_2/src/v12_bajo.asm hal/src/v12_bajo.asm
+--- HALCONES_ESTELARES_CODIGO_FUENTE_1_3_2/src/v12_bajo.asm	2026-11-12 03:20:19.506460104 +0100
++++ hal/src/v12_bajo.asm	2026-11-12 17:16:56.660883584 +0100
+@@ -459,152 +459,8 @@
+  ld (boss_bidx),a
+  ret
+ 
+-; ---------------------------------------------------------------------------
+-; FONDOS LEJANOS DE CADA FASE (tools/v12_fondos.py). Se dibujan en el cielo
+-; inmovil D800 en blanco tramado, igual que las estrellas: no tocan el color.
+-; Fase 1 nebulosa, 2 galaxia, 3 planeta con anillo, 4 cumulo; despues se repiten.
+-
+-; Borra el cielo de juego (columnas 2..23) en D800: quita el fondo anterior.
+-bg_clear:
+- ld c,0
+-bgc_row:
+- call bg_row_addr
+- inc e
+- inc e
+- xor a
+- ld b,22
+-bgc_byte:
+- ld (de),a
+- inc de
+- djnz bgc_byte
+- inc c
+- ld a,c
+- cp 192
+- jr nz,bgc_row
+- ret
+-
+-; C = y -> DE = principio de esa linea en D800. Conserva BC.
+-bg_row_addr:
+- ld l,c
+- ld h,0
+- add hl,hl
+- ld de,scanline_table
+- add hl,de
+- ld e,(hl)
+- inc hl
+- ld a,(hl)
+- add a,0x98
+- ld d,a
+- ret
+-
+-; Dibuja (borrando antes) el fondo de la fase actual en D800.
+-bg_draw:
+- call bg_clear
+- ld a,(phase_number)
+- dec a
+- and 3
+- add a,a
+- ld e,a
+- ld d,0
+- ld hl,bg_table
+- add hl,de
+- ld a,(hl)
+- inc hl
+- ld h,(hl)
+- ld l,a
+- ld a,(hl)
+- ld (bg_x),a                ; columna (bytes)
+- inc hl
+- ld a,(hl)
+- ld (bg_y),a                ; primera linea
+- inc hl
+- ld (bg_src),hl             ; 16 filas de bloques x 5 bytes
+- ld a,64
+- ld (bg_lines),a
+-bgd_line:
+- ld a,(bg_y)
+- ld c,a
+- call bg_row_addr
+- ld a,(bg_x)
+- add a,e
+- ld e,a                     ; DE = destino en D800
+- ld a,(bg_y)
+- and 3
+- ld (bg_k),a                ; fila dentro del bloque
+- ld hl,(bg_src)
+- ld b,5
+-bgd_byte:
+- ld a,(hl)
+- ld (bg_lv),a
+- call bg_pair               ; dos primeros bloques -> un byte
+- ld a,(bg_lv)
+- rlca
+- rlca
+- rlca
+- rlca
+- ld (bg_lv),a
+- call bg_pair               ; otros dos
+- inc hl
+- djnz bgd_byte
+- ld a,(bg_y)
+- inc a
+- ld (bg_y),a
+- and 3
+- jr nz,bgd_same_row
+- ld hl,(bg_src)
+- ld de,5
+- add hl,de
+- ld (bg_src),hl             ; siguiente fila de bloques
+-bgd_same_row:
+- ld a,(bg_lines)
+- dec a
+- ld (bg_lines),a
+- jr nz,bgd_line
+- ret
+-
+-; Niveles en los bits 7-6 y 5-4 de bg_lv -> byte de trama OR en (DE); DE+1.
+-bg_pair:
+- push hl
+- ld a,(bg_lv)
+- rlca
+- rlca
+- and 3
+- call bg_nibble
+- rlca
+- rlca
+- rlca
+- rlca
+- ld c,a
+- ld a,(bg_lv)
+- rlca
+- rlca
+- rlca
+- rlca
+- and 3
+- call bg_nibble
+- or c
+- ex de,hl
+- or (hl)
+- ld (hl),a
+- ex de,hl
+- inc de
+- pop hl
+- ret
+-; A = nivel -> A = medio byte de trama para la fila bg_k.
+-bg_nibble:
+- add a,a
+- add a,a
+- ld l,a
+- ld a,(bg_k)
+- add a,l
+- ld l,a
+- ld h,0
+- push de
+- ld de,bg_patterns
+- add hl,de
+- pop de
+- ld a,(hl)
+- ret
++; V1.3.3: los fondos lejanos de fase (V1.3) se han quitado: compartian celdas
++; de color con cuervos, balas y explosiones. Quedan la luna y Jupiter del MOAI.
+ 
+ ; V1.3 (sonido, desde tick_go; aqui en memoria baja: no es critico en tiempo)
+ ; Al empezar cada tick: presupuesto = 3/4 del rato libre del tick anterior
+diff -ruN -x __pycache__ -x '*.tap' -x '*.png' -x '*.bin' -x '*.scr' -x '*.gif' -x 'CAMBIOS_V1_3*.patch' HALCONES_ESTELARES_CODIGO_FUENTE_1_3_2/src/v12_hud.asm hal/src/v12_hud.asm
+--- HALCONES_ESTELARES_CODIGO_FUENTE_1_3_2/src/v12_hud.asm	2026-11-12 03:10:59.865127784 +0100
++++ hal/src/v12_hud.asm	2026-11-12 17:16:56.662825787 +0100
+@@ -9,12 +9,6 @@
+ hud_tmp equ 0xf048
+ face_k equ 0xf049
+ enemy_count equ 0xf0ab
+-bg_x equ 0xf0ac
+-bg_y equ 0xf0ad
+-bg_src equ 0xf0ae
+-bg_lines equ 0xf0b0
+-bg_k equ 0xf0b1
+-bg_lv equ 0xf0b2      ; V1.2: enemigos en juego (10 cuervos, 6 el resto)
+ snd_idle equ 0xf0b4         ; V1.3: rato libre del tick (unidades de 26 T)
+ snd_budget equ 0xf0b6       ; V1.3: trozo de sonido para la mitad del tick
+ snd_mid_ok equ 0xf0b8       ; V1.3: 1 = el trozo de mitad de tick aun no ha sonado
+diff -ruN -x __pycache__ -x '*.tap' -x '*.png' -x '*.bin' -x '*.scr' -x '*.gif' -x 'CAMBIOS_V1_3*.patch' HALCONES_ESTELARES_CODIGO_FUENTE_1_3_2/src/v12_sound.asm hal/src/v12_sound.asm
+--- HALCONES_ESTELARES_CODIGO_FUENTE_1_3_2/src/v12_sound.asm	2026-11-12 03:19:35.750590488 +0100
++++ hal/src/v12_sound.asm	2026-11-12 17:18:15.520814279 +0100
+@@ -18,6 +18,9 @@
+ mus_note equ 0xf05d
+ mus_loop equ 0xf05e
+ snd_play_mode equ 0xf060
++snd_shortf equ 0xf0bb       ; V1.3.3: 0x80 = segmento de golpe (rafaga corta)
++snd_burst equ 0xf0bc        ; V1.3.3: lo que le queda a la rafaga de este tick
++snd_burst_len equ 700       ; unidades de 26 T: 18 200 T, unos 5 ms
+ 
+ ; HL = efecto. Solo suena si su prioridad es >= la del efecto en curso.
+ sfx_start:
+@@ -51,9 +54,13 @@
+  ld (snd_left),a
+  ld a,(hl)
+  inc hl
++ ld e,a
++ and 0x80                   ; V1.3.3: bit 7 = golpe: una rafaga corta por tick
++ ld (snd_shortf),a
++ xor e
+  ld (snd_mode),a
+  ld (snd_seg),hl
+- ret
++ jr snd_burst_reset
+ sfx_end:
+  xor a
+  ld (snd_left),a
+@@ -81,6 +88,32 @@
+  ld hl,(snd_hp)
+  add hl,de
+  ld (snd_hp),hl
++snd_burst_reset:
++ ld hl,snd_burst_len
++ ld (snd_burst),hl
++ ret
++
++; V1.3.3: HL = semiperiodo. Gasta esa media onda de la rafaga del tick;
++; acarreo = la rafaga ya se acabo (silencio hasta el tick siguiente).
++; Conserva HL y DE.
++snd_burst_use:
++ push hl
++ push de
++ ex de,hl
++ ld hl,(snd_burst)
++ or a
++ sbc hl,de
++ jr c,snd_burst_out
++ ld de,8
++ sbc hl,de
++ jr nc,snd_burst_keep
++snd_burst_out:
++ ld hl,0
++ scf
++snd_burst_keep:
++ ld (snd_burst),hl
++ pop de
++ pop hl
+  ret
+ 
+ ; Toca el efecto en curso hasta que tick_irqs deje de valer E (o espera).
+@@ -95,7 +128,25 @@
+  jr z,snd_rest
+  ld hl,(snd_hp)
+  ld (snd_play_mode),a
+- jr tone_half
++ ld a,(snd_shortf)
++ or a
++ jr z,tone_half
++; V1.3.3: golpe: suena mientras quede rafaga y luego espera en silencio.
++burst_half:
++ call snd_burst_use
++ jp c,snd_rest
++ call snd_half
++ push hl
++ ld bc,(snd_idle)
++ add hl,bc
++ ld bc,8
++ add hl,bc
++ ld (snd_idle),hl
++ pop hl
++ ld a,(tick_irqs)
++ cp e
++ jr z,burst_half
++ ret
+ ; A = modo (0 tono, 1 ruido), HL = semiperiodo: suena hasta la siguiente IRQ.
+ tone_until_irq:
+  ld (snd_play_mode),a
+@@ -179,23 +230,34 @@
+  ld (snd_play_mode),a
+  push bc
+  push de
+- ld de,(snd_budget)
+- ld hl,(snd_idle)           ; cuenta como rato libre del tick (el final
+- add hl,de                  ; del tick sobrara eso menos)
+- ld (snd_idle),hl
++ ld de,(snd_budget)         ; DE = lo que queda del trozo
+  ld hl,(snd_hp)
+ snd_mid_loop:
++ ld a,(snd_shortf)          ; V1.3.3: un golpe acaba antes si se le acaba
++ or a                       ; la rafaga del tick
++ jr z,snd_mid_go
++ call snd_burst_use
++ jr c,snd_mid_end
++snd_mid_go:
+  call snd_half
+  ex de,hl
+  or a
+  sbc hl,de
+- jr c,snd_mid_end
++ jr c,snd_mid_zero
+  ld bc,8
+  sbc hl,bc
+- jr c,snd_mid_end
++ jr c,snd_mid_zero
+  ex de,hl
+  jr snd_mid_loop
++snd_mid_zero:
++ ld de,0
+ snd_mid_end:
++ ld hl,(snd_budget)         ; lo tocado cuenta como rato libre del tick (el
++ or a                       ; final del tick sobrara eso menos)
++ sbc hl,de
++ ld de,(snd_idle)
++ add hl,de
++ ld (snd_idle),hl
+  pop de
+  pop bc
+  ret
+@@ -302,41 +364,43 @@
+  jp sfx_start
+ 
+ ; efectos: prioridad, segmentos (semiperiodo, delta, ticks, modo), fin
+-; V1.3: rehechos para el beeper troceado (suena a rafagas, dos por tick): golpe
+-; de ruido al principio, que es lo que mejor se oye a trozos, y barridos cortos.
++; V1.3.3: GOLPES. Modo con el bit 7 (0x80 tono, 0x81 ruido): en cada tick
++; suena una sola rafaga de unos 5 ms, casi siempre entera en el trozo de mitad
++; de tick, y el resto del tick silencio. Asi el beeper ya no se oye cortado:
++; cada tick es un golpe limpio y los efectos largos son golpes seguidos.
+ fx_shot: db 1
+- dw 5
+- db 0,1,1                   ; chasquido
+- dw 28
+- db 22,3,0                  ; piu que cae
++ dw 6
++ db 0,1,0x81                ; chasquido
++ dw 30
++ db 20,1,0x80               ; tiu
+  dw 0
+ fx_enemy_fire: db 1
+- dw 90
+- db 242,3,0                 ; trino que sube
++ dw 80
++ db 236,2,0x80              ; pip-pip que sube
+  dw 0
+ fx_boss_fire: db 2
+- dw 60
+- db 0,1,1                   ; soplido
+- dw 260
+- db 24,3,0                  ; disparo grave
++ dw 50
++ db 0,1,0x81                ; soplido
++ dw 110
++ db 24,2,0x80               ; dos golpes graves
+  dw 0
+ fx_explode: db 2
+- dw 4
+- db 0,2,1                   ; estallido
+- dw 18
+- db 6,6,1                   ; retumbo que se apaga
++ dw 5
++ db 0,1,0x81                ; estallido
++ dw 14
++ db 8,4,0x81                ; cuatro golpes de ruido cada vez mas graves
+  dw 0
+ fx_boss_hit: db 2
+  dw 30
+- db 0,1,1                   ; golpe en la piedra
+- dw 340
+- db 40,2,0
++ db 0,1,0x81                ; golpe en la piedra
++ dw 70
++ db 0,1,0x81
+  dw 0
+ fx_boss_hit_low: db 2
+  dw 12
+- db 0,1,1                   ; la piedra cruje (le queda poco)
+- dw 140
+- db 30,3,0
++ db 0,1,0x81                ; la piedra cruje (le queda poco)
++ dw 90
++ db 30,2,0x80
+  dw 0
+ fx_shield_on: db 3
+  dw 420
+diff -ruN -x __pycache__ -x '*.tap' -x '*.png' -x '*.bin' -x '*.scr' -x '*.gif' -x 'CAMBIOS_V1_3*.patch' HALCONES_ESTELARES_CODIGO_FUENTE_1_3_2/tests/test_v13_galaga.py hal/tests/test_v13_galaga.py
+--- HALCONES_ESTELARES_CODIGO_FUENTE_1_3_2/tests/test_v13_galaga.py	2026-11-12 12:15:04.159109008 +0100
++++ hal/tests/test_v13_galaga.py	2026-11-12 17:22:12.010329135 +0100
+@@ -3,14 +3,17 @@
+ 1. Como mucho 2 balas propias en pantalla a la vez, a 12 px por tick; al
+    desaparecer una, se puede volver a disparar.
+ 2. La primera oleada trae 10 cuervos (dos filas de 5) y el resto 6 enemigos.
+-3. Cada fase pinta su fondo lejano en el cielo (D800), distinto en cada una;
+-   durante el MOAI el fondo se borra y vuelve en la fase siguiente.
++3. V1.3.3: sin fondos lejanos (choque de color): el cielo inmovil (D800)
++   queda vacio en las oleadas de todas las fases; el MOAI sigue con su luna
++   y Jupiter.
+ 4. Pantalla y sombra de atributos coinciden al acabar cada tick (sin celdas
+    rojas olvidadas al moverse los cuervos).
+ 5. Sonido: el efecto suena tambien a mitad de tick (interrupcion intermedia),
+    no solo al final, y el juego sigue a 25 ticks/s.
+ 6. La insignia ESF brilla (franja diagonal de color) al empezar la oleada y
+    vuelve a quedar blanca; pantalla y sombra iguales.
++8. V1.3.3: los efectos de golpe (disparo, estallido...) suenan como una sola
++   rafaga corta (unos 5 ms) por tick, no cortados en trozos.
+ 7. La melodia del titulo suena una vez cada vez que se llega al titulo (al
+    cargar y despues de cada Game Over) y luego hay silencio."""
+ import sys,json
+@@ -61,8 +64,7 @@
+         s.frame(())
+         if m[S['card_ticks']]==0:break
+     assert alive(m)==10 and m[S['enemy_count']]==10,'10 cuervos'
+-    bands=[band(m)]
+-    assert any(bands[0]),'fondo de la fase 1'
++    assert not any(band(m)),'sin fondo en la fase 1'
+     for f in range(60):s.frame(())
+     s.screen(str(R/'build'/'V13_FASE1_CUERVOS.png'))
+     # pasar a la segunda oleada: 6 enemigos
+@@ -80,10 +82,8 @@
+         if m[S['wave_stage']]==3 and m[S['boss_hp']]:break
+     for f in range(10):s.frame(())
+     assert m[S['wave_stage']]==3
+-    # huella de la nebulosa bajo la barbilla del MOAI (y=96..111, columnas
+-    # 2..15): alli no hay ni MOAI, ni Jupiter, ni luna
+-    sky=bytes(m[0xd800+ROWS[y]+c] for y in range(96,112) for c in range(2,16))
+-    assert not any(sky),'sin fondo durante el MOAI'
++    sky=bytes(m[0xd800+ROWS[y]+c] for y in range(96,152) for c in range(16,23))
++    assert any(sky),'Jupiter en el cielo del MOAI'
+     # derrotar al MOAI: la fase 2 trae otro fondo
+     m[S['boss_hp']]=1;b=S['bullet_slots'];m[b:b+3]=bytes([96,60,1])
+     for f in range(900):
+@@ -91,8 +91,7 @@
+         if m[S['phase_number']]==2 and m[S['wave_stage']]==0 and m[S['card_ticks']]:break
+     assert m[S['phase_number']]==2
+     for f in range(4):s.frame(())
+-    bands.append(band(m))
+-    assert any(bands[1]) and bands[1]!=bands[0],'fondo propio de la fase 2'
++    assert not any(band(m)),'sin fondo en la fase 2 (y sin restos del MOAI)'
+     s.screen(str(R/'build'/'V13_FASE2_FONDO.png'))
+ 
+ def test_atributos_coherentes():
+@@ -193,7 +192,28 @@
+     per2=title_music(s,s.frames)
+     assert sum(per2[:3])>500 and sum(per2[10:])==0,per2
+ 
++def test_golpes():
++    s=in_game();z=s.z;m=z.m
++    for f in range(100):
++        s.frame(())
++        if m[S['card_ticks']]==0 and m[S['snd_left']]==0:break
++    outs=[];op=s.port_out
++    def po(port,v):
++        if port&1==0:outs.append(z.t)
++        op(port,v)
++    z.port_out=po
++    t0=z.t
++    for f in range(8):s.frame({'SPACE'} if f<2 else ())
++    z.port_out=op
++    assert outs,'el disparo suena'
++    cl=[[outs[0]]]
++    for a,b in zip(outs,outs[1:]):
++        if b-a>3000:cl.append([b])
++        else:cl[-1].append(b)
++    spans=[(c[-1]-c[0])/3500 for c in cl]
++    assert 2<=len(cl)<=3 and max(spans)<8,('rafagas del disparo (ms)',spans)
++
+ if __name__=='__main__':
+-    for t in (test_disparo,test_formacion_y_fondos,test_atributos_coherentes,test_sonido_mitad_de_tick,test_brillo_insignia,test_musica_titulo_una_vez):
++    for t in (test_disparo,test_formacion_y_fondos,test_atributos_coherentes,test_sonido_mitad_de_tick,test_brillo_insignia,test_musica_titulo_una_vez,test_golpes):
+         t();print('PASS',t.__name__,flush=True)
+-    print('PASS V1.3: 2 balas a 12 px, 10 cuervos / 6 enemigos, fondo por fase, atributos coherentes, sonido a mitad de tick, brillo de la insignia, melodia del titulo una vez')
++    print('PASS V1.3: 2 balas a 12 px, 10 cuervos / 6 enemigos, cielo sin fondos, atributos coherentes, sonido a mitad de tick, brillo de la insignia, melodia del titulo una vez, golpes de sonido')
+diff -ruN -x __pycache__ -x '*.tap' -x '*.png' -x '*.bin' -x '*.scr' -x '*.gif' -x 'CAMBIOS_V1_3*.patch' HALCONES_ESTELARES_CODIGO_FUENTE_1_3_2/tools/v12_fondos.py hal/tools/v12_fondos.py
+--- HALCONES_ESTELARES_CODIGO_FUENTE_1_3_2/tools/v12_fondos.py	2026-11-12 02:26:58.073110971 +0100
++++ hal/tools/v12_fondos.py	1970-01-01 01:00:00.000000000 +0100
+@@ -1,89 +0,0 @@
+-"""HALCONES ESTELARES 1.2 - fondos lejanos de cada fase.
+-Cada fondo es un mapa de densidad de bloques de 4x4 px con 4 niveles (2 bits):
+-0 vacio, 1 muy tenue, 2 tenue, 3 medio. El juego lo expande con tramas fijas
+-en el cielo inmovil ($D800), en tinta blanca como las estrellas, asi que no
+-toca los atributos de color. 80x64 px por fondo = 80 bytes de datos."""
+-import math,random
+-PAT=[[0,0,0,0],[8,0,2,0],[10,0,5,0],[10,5,10,5]]   # nibbles por nivel y fila
+-W,H=20,16                                           # bloques (80x64 px)
+-def _q(v):return 0 if v<0.18 else 1 if v<0.45 else 2 if v<0.85 else 3
+-def nebulosa():
+-    r=random.Random(11);pts=[(r.uniform(4,16),r.uniform(3,13),r.uniform(2,5)) for _ in range(9)]
+-    m=[]
+-    for y in range(H):
+-        row=[]
+-        for x in range(W):
+-            v=sum(math.exp(-((x-a)**2+(y-b)**2)/(2*c*c)) for a,b,c in pts)*0.32
+-            v*=0.75+0.5*math.sin(x*1.3+y*0.7)*math.cos(y*1.1-x*0.4)   # filamentos
+-            row.append(_q(v))
+-        m.append(row)
+-    return m
+-def galaxia():
+-    m=[]
+-    for y in range(H):
+-        row=[]
+-        for x in range(W):
+-            dx=(x-9.5);dy=(y-7.5)*2.0                 # disco inclinado
+-            rr=math.hypot(dx,dy)+1e-6;th=math.atan2(dy,dx)
+-            arm=max(math.cos(2*th-1.1*math.log(rr+1)*2.2),0)**4
+-            v=math.exp(-rr/2.2)*1.3+arm*math.exp(-rr/7.0)*0.75
+-            row.append(_q(v))
+-        m.append(row)
+-    return m
+-def planeta():
+-    m=[]
+-    for y in range(H):
+-        row=[]
+-        for x in range(W):
+-            dx=(x-10)/5.2;dy=(y-8)/5.2;rr=dx*dx+dy*dy;v=0
+-            if rr<1:
+-                nz=math.sqrt(1-rr);sh=-0.6*dx-0.5*dy+0.6*nz
+-                v=0.25+0.55*max(sh,0)
+-            ring=abs(math.hypot((x-10)/9.0,(y-8)/2.4)-1)
+-            if ring<0.12 and not (rr<1 and dy<0):v=max(v,0.75)
+-            row.append(_q(v))
+-        m.append(row)
+-    return m
+-def cumulo():
+-    """Cumulo globular: nucleo denso que se deshace en estrellas sueltas."""
+-    r=random.Random(7);m=[[0]*W for _ in range(H)]
+-    for y in range(H):
+-        for x in range(W):
+-            rr=math.hypot(x-10,(y-8)*1.2);v=math.exp(-rr/2.6)*1.1
+-            m[y][x]=_q(v)
+-    for k in range(26):
+-        a=r.uniform(0,6.28);d=r.uniform(3,8.5);x=int(10+d*math.cos(a));y=int(8+d*math.sin(a)/1.2)
+-        if 0<=x<W and 0<=y<H:m[y][x]=max(m[y][x],1)
+-    return m
+-# (x en bytes, y en pixeles)
+-# V1.2: todos en la franja y=88..151, por debajo de las formaciones (los cuervos
+-# bajan hasta y=91): asi casi nunca comparten celda de color con un enemigo.
+-FONDOS=[(nebulosa(),13,88),(galaxia(),3,88),(planeta(),13,88),(cumulo(),4,88)]
+-def asm():
+-    out=['; V1.2 fondos de fase (generado por tools/v12_fondos.py)','bg_patterns:']
+-    out.append(' db '+','.join(str(n) for lv in PAT for n in lv))
+-    for i,(m,xc,y) in enumerate(FONDOS):
+-        out.append(f'bg_{i}:')
+-        out.append(f' db {xc},{y}')
+-        data=[]
+-        for row in m:
+-            for k in range(0,W,4):
+-                b=0
+-                for j in range(4):b=(b<<2)|row[k+j]
+-                data.append(b)
+-        out.append(' db '+','.join(map(str,data)))
+-    out.append('bg_table: dw '+','.join(f'bg_{i}' for i in range(len(FONDOS))))
+-    return out
+-def preview(path):
+-    from PIL import Image
+-    im=Image.new('RGB',(4*(W*4+8),H*4),(0,0,0))
+-    for i,(m,xc,y) in enumerate(FONDOS):
+-        for by in range(H):
+-            for bx in range(W):
+-                lv=m[by][bx]
+-                for k in range(4):
+-                    nib=PAT[lv][k]
+-                    for b in range(4):
+-                        if nib&(8>>b):im.putpixel((i*(W*4+8)+bx*4+b,by*4+k),(230,230,230))
+-    im.resize((im.width*3,im.height*3),0).save(path)
+-if __name__=='__main__':preview('/tmp/fondos.png')
+diff -ruN -x __pycache__ -x '*.tap' -x '*.png' -x '*.bin' -x '*.scr' -x '*.gif' -x 'CAMBIOS_V1_3*.patch' HALCONES_ESTELARES_CODIGO_FUENTE_1_3_2/tools/v12_graficos.py hal/tools/v12_graficos.py
+--- HALCONES_ESTELARES_CODIGO_FUENTE_1_3_2/tools/v12_graficos.py	2026-11-12 02:24:03.707270441 +0100
++++ hal/tools/v12_graficos.py	2026-11-12 17:16:56.661300199 +0100
+@@ -62,8 +62,6 @@
+     for name,data in hud_tables():out+=db_lines(name,data)
+     from tools.v12_sprites import build as sprites_build
+     out+=sprites_build(SCREENS['title'])
+-    from tools.v12_fondos import asm as fondos_asm
+-    (B/'v12_fondos.asm').write_text('\n'.join(fondos_asm())+'\n')
+     out.append('title_star_cells:')
+     for c,r in TITLE_STARS:out.append(f' dw {0x5800+r*32+c}')
+     out.append(f'title_star_count equ {len(TITLE_STARS)}')
+diff -ruN -x __pycache__ -x '*.tap' -x '*.png' -x '*.bin' -x '*.scr' -x '*.gif' -x 'CAMBIOS_V1_3*.patch' HALCONES_ESTELARES_CODIGO_FUENTE_1_3_2/tools/v12_sprites.py hal/tools/v12_sprites.py
+--- HALCONES_ESTELARES_CODIGO_FUENTE_1_3_2/tools/v12_sprites.py	2026-11-12 02:24:34.294272391 +0100
++++ hal/tools/v12_sprites.py	2026-11-12 17:23:01.962393501 +0100
+@@ -56,7 +56,7 @@
+     for f in range(3):
+         for ph in (0,2,4,6):blast+=blob[BL+f*768+ph*96:BL+f*768+ph*96+96]
+     # El escudo (32x32, 5 bytes x 32 lineas) tambien se queda con las fases pares:
+-    # libera 640 bytes mas para los fondos de cada fase.
++    # (en la V1.3 ese hueco fue para los fondos de fase; desde la 1.3.3 queda libre).
+     shield=b''.join(bytes(blob[SH+ph*160:SH+ph*160+160]) for ph in (0,2,4,6))
+     frame=bytes(blob[FR:FR+384])
+     del blob[BL:]

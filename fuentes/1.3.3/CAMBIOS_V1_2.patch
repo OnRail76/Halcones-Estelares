@@ -1,0 +1,4795 @@
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' HALCONES_ESTELARES_CODIGO_FUENTE_1_1/build.py hal/build.py
+--- V1_1/build.py	2026-11-12 00:05:40.150769035 +0100
++++ V1_2/build.py	2026-11-12 01:51:00.862202740 +0100
+@@ -14,24 +14,34 @@
+ from tools.z80_assembler import A
+ from tools.tap_writer import create_tap
+ from tools import relocate_sprite_assets_v22
+-source='\n'.join((R/p).read_text() for p in ['src/main.asm','src/irq_im2_v15.asm','src/title_screen.asm','src/gameover_v20.asm','src/phase_interlude_v24.asm','src/gameplay.asm','src/arcade_rules_v18.asm','src/boss_moai_v19.asm','src/sound_v19.asm','src/arcade_compositor.asm','src/stars_scroll_v13.asm','src/arcade_fast.asm','src/v11_controles.asm','build/assets.asm','build/combat_assets_v22.asm','build/title_data.asm','build/frame_data_v17.asm','build/shield_assets_v23.asm','build/phase_rle_v24.asm'])
++from tools import v12_graficos  # V1.2: datos nuevos (LZ, HUD, sprites, sonido)
++source='\n'.join((R/p).read_text() for p in ['src/main.asm','src/irq_im2_v15.asm','src/title_screen.asm','src/gameover_v20.asm','src/phase_interlude_v24.asm','src/gameplay.asm','src/arcade_rules_v18.asm','src/boss_moai_v19.asm','src/sound_v19.asm','src/arcade_compositor.asm','src/stars_scroll_v13.asm','src/arcade_fast.asm','src/v11_controles.asm','src/v12_hud.asm','src/v12_sound.asm','build/assets_v12.asm','build/combat_assets_v22.asm','build/v12_data.asm','build/frame_data_v17.asm'])
+ # V1.1: rutinas frias en memoria baja, a continuacion de los sprites reubicados.
+ # Dos ensamblados enlazados por direcciones absolutas (solo JP/CALL entre ellos).
+ import re as _re
+-low_src=(R/'src/v11_bajo.asm').read_text()
++low_src=(R/'src/v11_bajo.asm').read_text()+'\n'+(R/'src/v12_bajo.asm').read_text()
+ low_bin_sprites=(R/'build/sprites_reloc_v22.bin').read_bytes()
+ LOW_ORG=0x6000+len(low_bin_sprites)
+ low_names=[m[1] for m in _re.finditer(r'^([a-z_0-9]+):',low_src,_re.M)]
+ def _equs(d,skip=()):return '\n'.join(f'{k} equ {v}' for k,v in d.items() if k not in skip)+'\n'
++# V1.2: bloque de extras ($F401): MOAI + Jupiter + GAME OVER LZ + datos de sonido.
++_ex_bin=(R/'build/moai_bitmap_v19.bin').read_bytes()+(R/'build/jupiter_bitmap_v20.bin').read_bytes()+(R/'build/gameover_lz.bin').read_bytes()
++assert len(_ex_bin)>=920
++_ex_src=' org 0xf401\n'+'\n'.join(' db '+','.join(map(str,_ex_bin[i:i+32])) for i in range(0,len(_ex_bin),32))+'\n'+(R/'src/v12_extras.asm').read_text()
++_ex=A(_ex_src);extras_code=_ex.run()
++assert 0xf401+len(extras_code)<=0xfdf9,('extras llenos',hex(0xf401+len(extras_code)))
++extras_labels={k:v for k,v in _ex.labels.items()}
++print(f'EXTRAS: F401..{0xf401+len(extras_code)-1:04X} ({len(extras_code)} bytes); libres hasta FDF9: {0xfdf9-0xf401-len(extras_code)}')
++source=_equs(extras_labels)+source
+ a0=A(_equs({k:LOW_ORG for k in low_names})+source);a0.run()
+-main_labels={k:v for k,v in a0.labels.items() if k not in low_names}
++main_labels={k:v for k,v in a0.labels.items() if k not in low_names and k not in extras_labels}
+ lo=A(f' org {LOW_ORG}\n'+_equs(main_labels,set(low_names))+low_src);low_code=lo.run()
+ low_labels={k:lo.labels[k] for k in low_names}
+ source=_equs(low_labels)+source
+ (R/'build/starter.asm').write_text(source)
+ a=A(source);code=a.run()
+-assert {k:v for k,v in a.labels.items() if k not in low_names}==main_labels,'enlace inestable'
+-assert 0x8000+len(code)<0xC000
++assert {k:v for k,v in a.labels.items() if k not in low_names and k not in extras_labels}==main_labels,'enlace inestable'
++assert 0x8000+len(code)<0xC000,("bloque principal lleno",hex(0x8000+len(code)))
+ assert LOW_ORG+len(low_code)<=0x8000,('memoria baja llena',hex(LOW_ORG+len(low_code)))
+ (R/'build/starter.bin').write_bytes(code)
+ (R/'build/v11_bajo.bin').write_bytes(low_code)
+@@ -39,5 +49,5 @@
+ print(f'MEMORIA BAJA: {LOW_ORG:04X}..{LOW_ORG+len(low_code)-1:04X} ({len(low_code)} bytes); libres hasta 7FFF: {0x8000-LOW_ORG-len(low_code)}')
+ print(f'BLOQUE PRINCIPAL: 8000..{0x8000+len(code)-1:04X}; libres hasta BFFF: {0x4000-len(code)}')
+ tap=R/'build/HALCONES_ESTELARES_V281.tap'
+-create_tap(code,'HALCONES',tap,extra_code=(R/'build/moai_bitmap_v19.bin').read_bytes()+(R/'build/jupiter_bitmap_v20.bin').read_bytes()+(R/'build/gameover_rle_v20.bin').read_bytes(),extra_origin=0xf401,low_code=low_bin_sprites+low_code,low_origin=0x6000)
++create_tap(code,'HALCONES',tap,extra_code=extras_code,extra_origin=0xf401,low_code=low_bin_sprites+low_code,low_origin=0x6000)
+ print(f'ASSEMBLED {len(code)} bytes; SHA256={hashlib.sha256(tap.read_bytes()).hexdigest()}')
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' HALCONES_ESTELARES_CODIGO_FUENTE_1_1/docs/legacy_regressions/test_v281_logo_bird_pulse.py hal/docs/legacy_regressions/test_v281_logo_bird_pulse.py
+--- V1_1/docs/legacy_regressions/test_v281_logo_bird_pulse.py	1970-01-01 01:00:00.000000000 +0100
++++ V1_2/docs/legacy_regressions/test_v281_logo_bird_pulse.py	2026-11-11 22:31:48.480323034 +0100
+@@ -0,0 +1,81 @@
++#!/usr/bin/env python3
++"""Regression: assembled ZX title, original yellow letterforms, integrated beak, ARC pulse."""
++from pathlib import Path
++from mini_z80 import VM,SYM
++import hashlib,functools
++R=Path(__file__).resolve().parents[1]
++ref=(R/'assets/TITULO_01_IMPERIAL_SIN_PICO.scr').read_bytes()
++v27=(R/'assets/TITULO_V27_ORIGINAL_INTACTO.scr').read_bytes()
++new=(R/'assets/HALCONES_ESTELARES_TITLE.scr').read_bytes()
++assert len(ref)==len(new)==6912
++assert ref[:6144]!=new[:6144]
++assert new[6144:6144+10*32]==v27[6144:6144+10*32], 'Original V2.7 title ATTRIBUTES must be byte-exact!'
++assert new[6144+10*32:6144+13*32]==ref[6144+10*32:6144+13*32]
++assert ref[6144+14*32:]==new[6144+14*32:]
++# EXACT V2.7 title text + subtitle and rest unchanged; character bitmap & attrs through y=103.
++for y in list(range(0,104))+list(range(112,192)):
++    a=((y&0xC0)<<5)+((y&7)<<8)+((y&0x38)<<2)
++    assert new[a:a+32]==(v27 if y<80 else ref)[a:a+32], ('Non-beak bitmap changed',y)
++for y in range(104,112):
++    a=((y&0xC0)<<5)+((y&7)<<8)+((y&0x38)<<2)
++    for xbyte in range(32):
++        if xbyte not in (15,16):
++            assert new[a+xbyte]==ref[a+xbyte],('Outside beak cell modified',y,xbyte)
++for j,(a,b) in enumerate(zip(new[6144:],ref[6144:])):
++    assert a==(v27[6144+j] if j < 10*32 else b) or j in ((13*32+15),(13*32+16)),('Non-beak color modified',j)
++print('PASS V2.7 original title 80 scanlines and attributes BYTE-EXACT; complete IMPERIAL bird below')
++# Assemble executable, boot through title and test live animation exactly every 50Hz HALT.
++v=VM()
++v.run_to(lambda q:q.pc==SYM['title_wait_release'],steps=1_000_000)
++assert bytes(v.m[0x4000:0x5b00])==new
++v.keys=set()
++v.run_to(lambda q:q.pc==SYM['title_wait_press'],steps=10000)
++origbm=bytes(v.m[0x4000:0x5800]); origatr=bytes(v.m[0x5800:0x5b00]); source_attr=bytes(v.m[0x7d40:0x7e20])
++assert source_attr==new[6144+32:6144+8*32]
++yellow_cells=sum((x&7)==6 for x in origatr[32:256]);assert yellow_cells>100
++
++def frames(num):
++    for i in range(num):
++        assert v.pc==SYM['title_wait_press'],(i,hex(v.pc))
++        v.step()
++        v.run_to(lambda q:q.pc==SYM['title_wait_press'],steps=15000)
++
++def check_phase(p):
++    a=bytes(v.m[0x5800:0x5b00]);
++    assert bytes(v.m[0x4000:0x5800])==origbm,'Original font or hawk bitmap changed by pulse!'
++    assert a[:32]==origatr[:32] and a[256:]==origatr[256:],'Subtitle or other text was recolored!'
++    for col,(got,orig) in enumerate(zip(a[32:256],origatr[32:256])):
++        expected=0x47 if (p&1 and orig&7==6) else orig
++        assert got==expected,(p,col,hex(got),hex(expected))
++    assert v.m[SYM['title_pulse_phase']]==p
++
++check_phase(0)
++for duration,phase in ((75,1),(6,2),(9,3),(3,0),(75,1)):
++    frames(duration);check_phase(phase)
++print('PASS native Z80 double arcade pulse: 75/yellow -> 6/white -> 9/yellow -> 3/white -> 75/yellow')
++# Test boot and legacy beeper precisely, no input system change.
++v.keys={'SPACE'}
++v.run_to(lambda q:q.pc==SYM['title_wait_start_release'],steps=10000)
++v.keys=set()
++v.run_to(lambda q:q.pc==SYM['main_loop'],steps=900000)
++assert v.sp==0xfff0 and v.im==2
++oldwrites=v.port_writes;sp=v.sp;ret=v.pc
++v.push(ret);v.pc=SYM['beep_enemy_destroy']
++v.run_to(lambda q:q.pc==ret and q.sp==sp,steps=10000)
++assert v.port_writes-oldwrites==14
++# frame relocated immutable check
++import json
++frame=json.loads((R/'build/frame_manifest_v17.json').read_text())
++assert v.m[0x7bc0:0x7d40]==bytes(frame['bitmap'])
++print('PASS gameplay starts; brief 14 OUT blip retained; frame resource exact; IM2/SP intact')
++# Binary reproducibility + valid TAP blocks
++n=(R/'build/HALCONES_ESTELARES_V281.tap').read_bytes()
++p=0;blocks=[]
++while p<len(n):
++    l=int.from_bytes(n[p:p+2],'little');p+=2
++    block=n[p:p+l];p+=l
++    assert len(block)==l and functools.reduce(int.__xor__,block,0)==0
++    blocks.append(block)
++assert len(blocks)==8 and p==len(n)
++assert blocks[3][1:-1]==(R/'build/starter.bin').read_bytes()
++print('PASS V281 TAP integrity and main Z80 segment identical to assembled code')
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' HALCONES_ESTELARES_CODIGO_FUENTE_1_1/src/arcade_compositor.asm hal/src/arcade_compositor.asm
+--- V1_1/src/arcade_compositor.asm	2026-11-12 00:05:40.150975320 +0100
++++ V1_2/src/arcade_compositor.asm	2026-11-12 01:46:39.202223044 +0100
+@@ -213,10 +213,6 @@
+ spr_y: db 0
+ spr_cols: db 0
+ spr_height: db 0
+-spr_ptr: dw 0
+-spr_scan_table_ptr: dw 0
+-spr_col_byte: db 0
+-spr_rows_left: db 0
+ 
+ ; Initialize TWO private 6144-byte pixel planes while the screen shows static stars.
+ ; Shadow image = 0xC000...0xD7FF, immutable sky = 0xD800...0xEFFF.
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' HALCONES_ESTELARES_CODIGO_FUENTE_1_1/src/arcade_rules_v18.asm hal/src/arcade_rules_v18.asm
+--- V1_1/src/arcade_rules_v18.asm	2026-11-12 00:05:40.150999719 +0100
++++ V1_2/src/arcade_rules_v18.asm	2026-11-12 01:51:07.682564070 +0100
+@@ -116,7 +116,7 @@
+  xor a                       ; 0 segments, entire bar consumed.
+  ld (shield_meter),a        ; HUD empties on following presentation.
+  ei                          ; Restore IM2 maskable IRQs.
+- call beep_shield_activate   ; Short event, outside ISR and atomic section.
++ call sfx_shield_on        ; V1.2: "vuuum" y zumbido mientras dura.
+  ret                         ; Field activated with one physical press.
+ shield_key_release:
+  xor a                       ; Unlatch key once physically released.
+@@ -157,7 +157,7 @@
+  jr nc,shield_bird_next     ; No intersection.
+  ld (ix+2),3                ; Replace bird with short explosion.
+  ld (ix+5),6                ; Six-update explosion, visible to the player.
+- call beep_shield_contact
++ call sfx_explode
+  call score_add_kill         ; V1.1: marcador de 16 bits y vida extra.
+ shield_bird_next:
+  ld de,6                     ; Size of enemy record.
+@@ -327,7 +327,7 @@
+  ret nc
+  ld (ix+1),a                ; New downward shot Y.
+  ld (ix+2),1                 ; Activate this free projectile slot.
+- call beep_enemy_fire
++ call sfx_enemy_fire
+  ret                         ; Render it in the compositing pass.
+ 
+ boss_bullet_spawn:
+@@ -342,8 +342,8 @@
+  ld a,48                   ; Shots leave the mask well above our ESF.
+  ld (ix+1),a
+  ld (ix+2),1
+- call beep_boss_fire
+- ret
++ call sfx_boss_fire
++ jp mouth_open              ; V1.2: el MOAI abre la boca al disparar.
+ 
+ ; Three active enemy bullets are OR-rendered by a pre-shifted 4px missile shape.
+ enemy_bullet_draw_all:
+@@ -351,7 +351,8 @@
+  ld b,3                      ; Render three records maximum.
+ enemy_bullet_draw_loop:
+  push bc                      ; Sprite renderer destroys BC.
+- call bullet_draw_ix         ; V1.1: mismo dibujo rapido que las balas propias.
++ ld bc,enemy_shot_phase_ptrs ; V1.2: rombo de plasma, distinto del haz propio.
++ call bullet_draw_with
+ enemy_bullet_draw_next:
+  ld de,3                     ; Advance to next projectile.
+  add ix,de                   ; IX=next record.
+@@ -401,7 +402,7 @@
+  jr nc,ship_hit_bird_next    ; No overlap.
+  ld (ix+2),3                ; Contact explosion, not an instant disappearance.
+  ld (ix+5),6                ; Six visible blast updates; excludes repeat hits.
+- call beep_enemy_destroy
++ call sfx_explode
+  call player_take_hit       ; One life lost, if grace period not in progress.
+ ship_hit_bird_next:
+  ld de,6                     ; Next bird record.
+@@ -428,99 +429,7 @@
+  call beep_player_death      ; Distinct short descending death cue.
+  ret                         ; HUD sync occurs in combat_tick.
+ 
+-; HUD bar: precomputed 9 stages, 8 scanlines each, 4 bytes per row.
+-; Only touched when shield_meter changes (about once a second).
+-shield_bar_present:
+- ld a,(shield_meter)         ; Current count 0..8 segments.
+- ld b,a                      ; Keep current count in B.
+- ld a,(shield_meter_displayed) ; Previously drawn count.
+- cp b                        ; Is native HUD up to date?
+- ret z                       ; No writes on unchanged meter.
+- ld a,b                      ; Reload stage count.
+- ld (shield_meter_displayed),a ; Mark newly published stage.
+- ld l,a                      ; HL = index 0..8.
+- ld h,0                      ; Extend index to 16-bit.
+- add hl,hl                   ; *2.
+- add hl,hl                   ; *4.
+- add hl,hl                   ; *8.
+- add hl,hl                   ; *16.
+- add hl,hl                   ; *32 bytes per stage.
+- ld de,shield_bar_frames     ; Packed 9-stage native bitmap source.
+- add hl,de                   ; HL points to first of 32 source bytes.
+- ld (shield_bar_source),hl   ; Save pointer across destination address setup.
+- ld a,96                     ; Meter first pixel row.
+- ld (shield_bar_y),a         ; Scratch Y for eight scanlines.
+-shield_bar_row:
+- ld a,(shield_bar_y)          ; Current Y=96..103.
+- ld l,a                      ; HL=Y.
+- ld h,0                      ; Extend to 16-bit.
+- add hl,hl                   ; 2 bytes per precomputed scanline pointer.
+- ld de,scanline_table        ; Nonlinear Spectrum 48K address table.
+- add hl,de                   ; Resolve native row destination.
+- ld e,(hl)                   ; E=screen address low.
+- inc hl                      ; Next table byte.
+- ld d,(hl)                   ; D=screen address high.
+- ld a,e                      ; Add 26 pixel-byte columns (192/8 + 2).
+- add a,26                    ; HUD center bar occupies columns 26..29.
+- ld e,a                      ; DE is live screen destination.
+- ld hl,(shield_bar_source)   ; Reload source cursor into packed stage data.
+- ld bc,4                     ; Four bytes of bar pixels on this row.
+- ldir                        ; Copy final meter pixels to live screen.
+- ld (shield_bar_source),hl   ; Save 4-byte-advanced source for next line.
+- ld a,(shield_bar_y)          ; Current scanline.
+- inc a                       ; Advance downward.
+- ld (shield_bar_y),a         ; Save next destination row.
+- cp 104                      ; End after pixel row 103.
+- jr nz,shield_bar_row       ; Continue eight physical bitmap rows.
+- ret                         ; Meter complete, far from gameplay field.
+-
+-; Lives: preserve original GRIT icons; only remove icons of lost lives.
+-lives_hud_present:
+- ld a,(player_lives)          ; Current lives 0..3.
+- ld b,a                       ; Save target.
+- ld a,(lives_displayed)       ; Last committed life count.
+- cp b                         ; Display matches?
+- ret z                        ; No need to redraw.
+- ld a,b                       ; Target lives count.
+- ld (lives_displayed),a       ; Commit target.
+- ld l,a                       ; HL = index.
+- ld h,0                       ; Clear high.
+- add hl,hl                    ; *2.
+- add hl,hl                    ; *4.
+- add hl,hl                    ; *8.
+- add hl,hl                    ; *16.
+- ld d,h                       ; DE=stage*16 high.
+- ld e,l                       ; DE=stage*16 low.
+- add hl,hl                    ; HL=stage*32.
+- add hl,de                    ; HL=stage*48 (6 columns*8 rows).
+- ld de,lives_hud_frames      ; Actual bitmap states.
+- add hl,de                   ; Source for exact life count.
+- ld (lives_hud_source),hl     ; Source cursor.
+- ld a,64                      ; Life icon row 64..71.
+- ld (lives_hud_y),a           ; Save row index.
+-lives_hud_row:
+- ld a,(lives_hud_y)           ; Y coordinate.
+- ld l,a                       ; HL=Y.
+- ld h,0                       ; Extend to word.
+- add hl,hl                    ; Word entries.
+- ld de,scanline_table        ; Precomputed native row addresses.
+- add hl,de                    ; HL=physical address entry.
+- ld e,(hl)                   ; Screen scanline low.
+- inc hl                      ; Advance.
+- ld d,(hl)                   ; Screen scanline high.
+- ld a,e                      ; Horizontal byte column.
+- add a,25                    ; Full HUD icon strip x200..247.
+- ld e,a                      ; DE=live HUD destination.
+- ld hl,(lives_hud_source)    ; HL=packed original icon bitmap.
+- ld bc,6                     ; Six byte-columns protect all life icons.
+- ldir                        ; Copy icon pixels only.
+- ld (lives_hud_source),hl    ; Save updated cursor.
+- ld a,(lives_hud_y)          ; Current Y.
+- inc a                       ; Next scanline.
+- ld (lives_hud_y),a          ; Store.
+- cp 72                       ; Eight scanlines total.
+- jr nz,lives_hud_row        ; Continue remaining rows.
+- ret                         ; HUD life icons match game state.
++; V1.2: shield_bar_present y lives_hud_present estan en src/v12_hud.asm.
+ 
+ ; Old/new shield color outline; allow cyan cockpit and yellow thrusters to win.
+ shield_color_unpaint:
+@@ -569,14 +478,10 @@
+ shield_charge_frame: db 0    ; 0..37 partial eighth segment.
+ shield_meter: db 8           ; 0..8 green segments.
+ shield_meter_displayed: db 8 ; Last drawn meter state.
+-shield_bar_source: dw 0      ; Rendering cursor.
+-shield_bar_y: db 0           ; Rendering row.
+ shield_ready_pending: db 0  ; ISR only flags sound; beeper driven by main loop.
+ shield_invulnerable: db 0    ; Post-hit protection in real IRQs.
+ player_lives: db 3           ; Three lives as classic arcade.
+ lives_displayed: db 3       ; Last native HUD lives visible.
+-lives_hud_source: dw 0       ; Packed life bitmap pointer.
+-lives_hud_y: db 0            ; Current y row.
+ shield_outline_color: db 0x44 ; Ink for current shield perimeter attr.
+ shot_spawn_turn: db 0       ; Preferred rotating gunner (0..5).
+ shot_shooter_index: db 0     ; Current scan index, wraps safely.
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' HALCONES_ESTELARES_CODIGO_FUENTE_1_1/src/arcade_xor_fast.asm hal/src/arcade_xor_fast.asm
+--- V1_1/src/arcade_xor_fast.asm	2026-11-12 00:05:40.151019927 +0100
++++ V1_2/src/arcade_xor_fast.asm	2026-11-12 01:46:39.198443481 +0100
+@@ -150,7 +150,3 @@
+ spr_y: db 0
+ spr_cols: db 0
+ spr_height: db 0
+-spr_ptr: dw 0
+-spr_scan_table_ptr: dw 0
+-spr_col_byte: db 0
+-spr_rows_left: db 0
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' HALCONES_ESTELARES_CODIGO_FUENTE_1_1/src/boss_moai_v19.asm hal/src/boss_moai_v19.asm
+--- V1_1/src/boss_moai_v19.asm	2026-11-12 00:05:40.151031015 +0100
++++ V1_2/src/boss_moai_v19.asm	2026-11-12 01:51:00.863217613 +0100
+@@ -7,6 +7,7 @@
+ boss_start:
+  ld a,18                    ; 18 player shot hits to defeat boss (prototype balance).
+  ld (boss_hp),a
++ call boss_v12_start        ; V1.2: grietas, boca, derrumbe y luna a cero.
+  ld a,8
+  ld (boss_death_left),a  ; Short red/white destruction flash on defeat.
+  xor a
+@@ -50,7 +51,7 @@
+  call boss_planet_palette_cyan ; BRIGHT cyan on black for the static Jupiter.
+  ; One-time scene cut: replace work with authoritative sky, then screen.
+  call boss_scene_sync
+- call beep_boss_intro
++ call sfx_siren               ; V1.2: sirena mientras entra el MOAI
+  ret
+ 
+ boss_scene_sync:
+@@ -117,14 +118,20 @@
+  ret
+ 
+ boss_eye_tick:
+- ld a,(frame_index)
+- and 31                     ; 32 logic frames (~1.3s if 25Hz), distinct holds.
+- cp 16
+- jr nc,boss_eye_off
+- ld a,0x42                  ; BRIGHT RED on black paper.
+- jr boss_eye_apply
+-boss_eye_off:
+- ld a,0x40                  ; BRIGHT BLACK on black paper (eyes go dark).
++ ; V1.2: los ojos se encienden justo antes de cada disparo (y con la boca
++ ; abierta); el resto del tiempo estan apagados. Avisan de lo que viene.
++ ld a,(boss_hp)
++ or a
++ ret z
++ ld a,(mouth_ticks)
++ or a
++ ld a,0x42
++ jr nz,boss_eye_apply
++ ld a,(enemy_fire_cd)
++ cp 10
++ ld a,0x42
++ jr c,boss_eye_apply
++ ld a,0x40
+ boss_eye_apply:
+  ld (0x586a),a              ; Eye L: attribute row3 col10 ($5800+96+10).
+  ld (0x586d),a              ; Eye R: attribute row3 col13.
+@@ -135,7 +142,7 @@
+ boss_update:
+  ld a,(boss_hp)
+  or a
+- ret nz
++ jp nz,boss_alive_tick      ; V1.2: boca que se cierra y luna que cruza.
+  ld a,(boss_death_left)    ; Eight update flashes before cleaning the stage.
+  or a
+  jp z,boss_erase_start
+@@ -149,38 +156,9 @@
+  call boss_palette_red
+  ret
+ boss_erase_start:
+- ; Boss defeated: erase both imported assets in immutable background.
++ call boss_blocks_tick      ; V1.2: se derrumba por bloques (3 por tick).
++ ret nz
+  call boss_planet_erase
+- ; Boss defeated: erase precisely its own 48x88 immutable rectangle.
+- ld a,8
+- ld (boss_y),a
+-boss_erase_row:
+- ld a,(boss_y)
+- ld l,a
+- ld h,0
+- add hl,hl
+- ld de,scanline_table
+- add hl,de
+- ld e,(hl)
+- inc hl
+- ld d,(hl)
+- ld a,e
+- add a,9
+- ld e,a
+- ld a,d
+- add a,152
+- ld d,a
+- xor a
+- ld b,6
+-boss_erase_bytes:
+- ld (de),a
+- inc de
+- djnz boss_erase_bytes
+- ld a,(boss_y)
+- inc a
+- ld (boss_y),a
+- cp 96
+- jr nz,boss_erase_row
+  call boss_scene_sync
+  call boss_planet_palette_white  ; Restore white starfield attributes for next wave.
+  ld a,0x47
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' HALCONES_ESTELARES_CODIGO_FUENTE_1_1/src/gameover_v20.asm hal/src/gameover_v20.asm
+--- V1_1/src/gameover_v20.asm	2026-11-12 00:05:40.151041776 +0100
++++ V1_2/src/gameover_v20.asm	2026-11-12 01:46:39.199334277 +0100
+@@ -21,6 +21,8 @@
+ gameover_enter:
+  call gameover_screen_show  ; Native GAME OVER screen, "PULSA SPACE" hidden.
+  call gameover_score_draw   ; The ACTUAL final points from kills * 10.
++ call record_check          ; V1.2: record batido?
++ call gameover_record_draw  ; V1.2: record y NUEVO RECORD.
+  ; START COUNTING ONLY AFTER THE COMPLETE SCREEN IS VISIBLE.
+  di                         ; Timer/state changed atomically relative to IM2.
+  ld hl,150                  ; PAL Spectrum: 3 complete seconds at 50Hz.
+@@ -28,8 +30,16 @@
+  ld a,1
+  ld (gameover_mode),a
+  ei
++ ld hl,tune_gameover        ; V1.2: melodia triste, o alegre si hay record
++ ld a,(new_record)
++ or a
++ jr z,gameover_tune
++ ld hl,tune_record
++gameover_tune:
++ ld de,0
++ call music_start
+ gameover_wait_3_seconds:
+- halt                       ; No SPACE check during this entire period.
++ call music_frame           ; V1.2: (antes HALT) sin leer mandos.
+  ld hl,(gameover_timer)
+  ld a,h
+  or l
+@@ -38,11 +48,11 @@
+  ld (gameover_mode),a     ; Stop IRQ gate after timer expires.
+  call gameover_prompt_show  ; Reveal pre-existing pixel text by ATTR change.
+ gameover_wait_release:
+- halt
++ call music_frame
+  call any_fire_pressed      ; V1.1: cualquier fuego (teclado, Sinclair, Kempston).
+  jr z,gameover_wait_release ; Require released SPACE before allowing return.
+ gameover_wait_press:
+- halt
++ call music_frame
+  call any_fire_pressed
+  jr nz,gameover_wait_press
+  jp title_session_start     ; Exactly one SPACE returns to TITLE, not game.
+@@ -51,7 +61,7 @@
+ gameover_screen_show:
+  ld hl,0xf799               ; Supplement follows 528 MOAI + 392 Jupiter bytes.
+  ld de,0x4000               ; Fresh physical native Spectrum VRAM destination.
+- jp title_unpack_next       ; That routine RETs to the original CALLer.
++ jp lz_unpack               ; V1.2: comprimida LZ.
+ 
+ ; Make hidden PULSA SPACE visible in native attribute row21, cols11..20.
+ ; Bitmap pixels were decoded during the first GAME OVER SCR load.
+@@ -137,7 +147,6 @@
+ 
+ gameover_mode: db 0
+ gameover_timer: dw 0
+-go_remainder: db 0
+ go_col: db 0
+ go_y: db 0
+ go_glyph: dw 0
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' HALCONES_ESTELARES_CODIGO_FUENTE_1_1/src/gameplay.asm hal/src/gameplay.asm
+--- V1_1/src/gameplay.asm	2026-11-12 00:05:40.151050298 +0100
++++ V1_2/src/gameplay.asm	2026-11-12 01:51:07.683150164 +0100
+@@ -19,6 +19,8 @@
+  ld (player_respawn_pending),a ; No pending respawn on new game.
+  ld (kills),a
+  ld (tick_irqs),a            ; V1.1: el primer tick empieza con el reloj a cero.
++ ld hl,(record_words)        ; V1.2: record al empezar (para NUEVO RECORD)
++ ld (record_start),hl
+  ld (score_words),a          ; V1.1: marcador de 16 bits a cero.
+  ld (score_words+1),a
+  ld (life_next),a
+@@ -54,7 +56,8 @@
+  call shield_init          ; V1.8: arm real-time shield, lives and enemy projectiles.
+  call color_shadow_init      ; Snapshot current VRAM color attrs into private 768-byte RAM plane.
+  call led_frame_apply        ; Only the upper warning lamp begins BRIGHT; other two start dim.
+- jp wave_card_start          ; V1.1: cartel OLEADA 1 (tras copiar los atributos).
++ call wave_card_start        ; V1.1: cartel OLEADA 1 (tras copiar los atributos).
++ jp hud_draw_all             ; V1.2: marcador completo con los valores de la partida nueva.
+ 
+ combat_tick:
+  ; Keep OLD positions and animation phase: no long whole-wave erase interval.
+@@ -116,6 +119,7 @@
+  call player_unpaint_old     ; Restore old cockpit/engines ONLY in the attribute shadow.
+  call wave_paint_new         ; Build full new enemy palette before changing visible ULA attributes.
+  call player_paint_new       ; Ship palette has final priority in the shadow attribute map.
++ call enemy_bullet_colors   ; V1.2: rombos enemigos en magenta (solo sobre celdas blancas).
+  call composite_update      ; Compose/present all sprite pixels without whitening on-screen color.
+  call card_draw             ; V1.1: texto del cartel OLEADA encima de todo.
+  call color_shadow_present  ; Copy fully composed 8x8 attributes in one final pass to VRAM.
+@@ -134,7 +138,7 @@
+  ret z
+  xor a
+  ld (shield_ready_pending),a
+- call beep_shield_ready
++ call sfx_shield_ready
+  ret
+ 
+ ; V1.6: PRIVATE COLOR PLANE, deliberately independent of sprite bitmap planes.
+@@ -202,6 +206,28 @@
+  ld a,(shield_frame_state)
+  cp 1
+  call z,color_present_shield_new
++ ; V1.2: celdas de los rombos enemigos (antiguas y nuevas), 2x2.
++ ld ix,old_enemy_bullets
++ call color_present_bullets
++ ld ix,enemy_bullet_slots
++color_present_bullets:
++ ld b,3
++color_bullet_loop:
++ push bc
++ ld a,(ix+2)
++ or a
++ jr z,color_bullet_next
++ ld a,2
++ ld (color_rect_w),a
++ ld (color_rect_h),a
++ ld b,(ix+0)
++ ld c,(ix+1)
++ call color_present_box
++color_bullet_next:
++ ld de,3
++ add ix,de
++ pop bc
++ djnz color_bullet_loop
+  ret
+ 
+ ; 5x5 ULA attribute cells for shield, clipped to x<192. Changed only on active ticks.
+@@ -252,6 +278,8 @@
+ 
+ ; Input BC = ship x/y pixels. Vary footprint 3 or 4 cells for pixel alignment.
+ color_present_ship:
++ ld a,4                    ; V1.2: siempre 4 filas (la llama baja a la fila siguiente).
++ ld (color_rect_h),a
+  ld a,b                    ; A=left edge x pixel.
+  and 7                     ; Test if sprite left edge is byte-aligned.
+  ld a,3                    ; 24px wide occupies 3 cells when aligned.
+@@ -259,13 +287,6 @@
+  inc a                     ; Misaligned sprite can occupy 4 attribute columns.
+ color_ship_width_ok:
+  ld (color_rect_w),a       ; Save selected width for the ship.
+- ld a,c                    ; A=top edge y pixel.
+- and 7                     ; Test if the ship is at exact 8px y boundary.
+- ld a,3                    ; 24px high occupies 3 rows if aligned.
+- jr z,color_ship_height_ok ; Avoid a fourth row at the lower edge.
+- inc a                     ; Partial vertical alignment adds fourth row.
+-color_ship_height_ok:
+- ld (color_rect_h),a       ; Save selected height for ship footprint.
+  jp color_present_box      ; Present precisely that rectangle.
+ 
+ ; Input B=pixel x, C=pixel y, color_rect_w/h=desired sizes (2..4).
+@@ -551,7 +572,16 @@
+  ld b,a                   ; Set left X sample.
+  ld a,(ship_attr_ink)     ; Desired exhaust color.
+  call ship_attr_plot      ; Left lower exhaust cell.
+- ret                      ; Done.
++ ld a,(ship_attr_y)       ; V1.2: celdas de la llama, bajo cada tobera.
++ add a,26
++ ld c,a
++ ld a,(ship_attr_ink)
++ call ship_attr_plot
++ ld a,(ship_attr_x)
++ add a,14
++ ld b,a
++ ld a,(ship_attr_ink)
++ jp ship_attr_plot
+ 
+ ; Revert only the colored old footprint. Enemy colors are applied afterwards.
+ ; Using white default is valid because the static playfield is bright-white
+@@ -664,7 +694,7 @@
+  ld (spr_y),a
+  ld a,4
+  ld (spr_cols),a
+- ld a,24
++ ld a,28                 ; V1.2: 24 filas de nave + 4 de llama
+  ld (spr_height),a
+  call sprite_restore
+  ld a,(shield_previous_state)
+@@ -679,7 +709,7 @@
+  ld (spr_y),a
+  ld a,5
+  ld (spr_cols),a
+- ld a,32
++ ld a,34                 ; V1.2: escudo (32) hasta el final de la llama
+  ld (spr_height),a
+  jp sprite_restore
+ 
+@@ -861,7 +891,7 @@
+  cp c
+  jp c,cps_moved_up
+  sub c
+- add a,24
++ add a,28                 ; V1.2: 24 filas de nave + 4 de llama
+  ld (spr_height),a
+  ld a,c
+  ld (spr_y),a
+@@ -870,7 +900,7 @@
+  ld b,a
+  ld a,c
+  sub b
+- add a,24
++ add a,28                 ; V1.2: 24 filas de nave + 4 de llama
+  ld (spr_height),a
+  ld a,b
+  ld (spr_y),a
+@@ -886,7 +916,7 @@
+  ld (spr_y),a
+  ld a,5
+  ld (spr_cols),a
+- ld a,32
++ ld a,34                 ; V1.2: escudo (32) hasta el final de la llama
+  ld (spr_height),a
+  call sprite_present
+  ld a,(ship_new_x)
+@@ -897,7 +927,7 @@
+  ld (spr_y),a
+  ld a,5
+  ld (spr_cols),a
+- ld a,32
++ ld a,34                 ; V1.2: escudo (32) hasta el final de la llama
+  ld (spr_height),a
+  jp sprite_present
+ 
+@@ -908,7 +938,7 @@
+  ld (spr_y),a
+  ld a,4
+  ld (spr_cols),a
+- ld a,24
++ ld a,28                 ; V1.2: 24 filas de nave + 4 de llama
+  ld (spr_height),a
+  call sprite_present
+  ld a,(ship_new_x)
+@@ -917,7 +947,7 @@
+  ld (spr_y),a
+  ld a,4
+  ld (spr_cols),a
+- ld a,24
++ ld a,28                 ; V1.2: 24 filas de nave + 4 de llama
+  ld (spr_height),a
+  jp sprite_present
+ 
+@@ -1002,31 +1032,6 @@
+ 
+ ; Sound effects are bounded (~1 ms, not a blocking music player).
+ ; FE port bit 4 drives the beeper. Border remains black.
+-beep_blaster:
+- ld a,16
+- out (0xfe),a
+- ld b,70
+-beep_blaster_hi:
+- djnz beep_blaster_hi
+- xor a
+- out (0xfe),a
+- ld b,70
+-beep_blaster_low:
+- djnz beep_blaster_low
+- ret
+-beep_hit:
+- ld a,16
+- out (0xfe),a
+- ld b,115
+-beep_hit_hi:
+- djnz beep_hit_hi
+- xor a
+- out (0xfe),a
+- ld b,115
+-beep_hit_low:
+- djnz beep_hit_low
+- ret
+-
+ enemy_palettes: db 70,66,69,66  ; bright yellow, red, cyan, CROW red
+ old_anim_phase: db 0
+ anim_phase: db 0
+@@ -1051,7 +1056,7 @@
+  ld (spr_y),a
+  ld a,4
+  ld (spr_cols),a
+- ld a,24
++ ld a,28                 ; V1.2: 24 filas de nave + 4 de llama
+  ld (spr_height),a
+  call sprite_present
+  call wave_paint_new
+@@ -1107,6 +1112,25 @@
+  ld a,24
+  ld (spr_height),a
+  call sprite_render
++ ; V1.2: llama de los motores, dos dibujos alternos, debajo de las toberas.
++ ld hl,flame_phase_ptrs_f0
++ ld a,(frame_index)
++ and 2
++ jr z,player_flame_ready
++ ld hl,flame_phase_ptrs_f1
++player_flame_ready:
++ ld (spr_data),hl
++ ld a,(ship_x)
++ add a,8
++ ld (spr_x),a
++ ld a,(ship_y)
++ add a,24
++ ld (spr_y),a
++ ld a,2
++ ld (spr_cols),a
++ ld a,4
++ ld (spr_height),a
++ call sprite_render
+  ld a,(shield_frame_state)             ; Check whether field is currently active.
+  cp 1                            ; 1 = protecting the ship for 3 seconds.
+  ret nz                          ; No overlay when ready or recharging.
+@@ -1236,7 +1260,7 @@
+  sub 8                ; bullet starts 8 pixels ahead of ship
+  ld (ix+1),a          ; save bullet Y
+  ld (ix+2),1          ; activate bullet slot
+- call beep_blaster    ; short beeper pulse once per shot
++ call sfx_shot        ; V1.2: "piu" laser
+  ret                  ; done: one shot for one press
+ player_fire_release:
+  xor a                ; A=0 denotes released key
+@@ -1533,6 +1557,24 @@
+ ; Their original bitmap remains immutable: only native 8x8 INK attributes
+ ; and private color shadow are changed. No sprite/compositor memory writes.
+ led_frame_tick:
++ ; V1.2: los LEDs del marco informan. MOAI: los tres fijos en rojo. Enemigo
++ ; bajando cerca de la nave: los tres parpadean rapido. Si no, el barrido de
++ ; siempre: verde con el escudo listo, rojo mientras no lo esta.
++ ld a,(wave_stage)
++ cp 3
++ ld a,0x42
++ jr z,led_all
++ call led_danger
++ jr z,led_sweep
++ ld a,(frame_index)
++ and 2
++ ld a,0x42
++ jr nz,led_all
++ ld a,0x02
++led_all:
++ ld b,a
++ jr led_write
++led_sweep:
+  ld a,(led_anim_clock)
+  inc a
+  cp 8
+@@ -1546,37 +1588,61 @@
+  jp led_frame_apply
+ led_frame_clock_store:
+  ld (led_anim_clock),a
+- ret
+ led_frame_apply:
+- ; Dim lamps with normal red (INK2, BRIGHT0), not black: keeps rail visible.
+- ; Lighting uses BRIGHT RED (0x42); darkness uses 0x02 to avoid rail gaps.
+- ld a,0x02
+- ld (0x58c0),a             ; Upper lamp: attribute row 6 column 0.
+- ld (0x5980),a             ; Middle lamp: row 12 column 0.
+- ld (0x5a40),a             ; Lower lamp: row 18 column 0.
+- ld (0xf1c0),a             ; Shadow attribute equivalents.
+- ld (0xf280),a
+- ld (0xf340),a
+- ld a,(led_anim_phase)
++ ld bc,0x0242               ; B = apagado, C = encendido (rojo)
++ ld a,(shield_state)
+  or a
+- jp z,led_frame_upper
++ jr nz,led_colors_ok
++ ld bc,0x0444               ; escudo listo: verde
++led_colors_ok:
++ call led_write             ; los tres apagados...
++ ld a,(led_anim_phase)      ; ...y se enciende el que toca (0 arriba, 1/3 centro, 2 abajo)
++ ld hl,0x58c0
++ or a
++ jr z,led_one
++ ld hl,0x5a40
+  cp 2
+- jp z,led_frame_lower
+- ; Animation steps 1 and 3 both illuminate the center lamp.
+- ld a,0x42
+- ld (0x5980),a
+- ld (0xf280),a
++ jr z,led_one
++ ld hl,0x5980
++led_one:
++ ld (hl),c
++ ld a,h
++ add a,0x99                 ; $58xx -> $F1xx (sombra privada)
++ ld h,a
++ ld (hl),c
+  ret
+-led_frame_upper:
+- ld a,0x42
++led_write:                  ; B = atributo para las tres lamparas
++ ld a,b
+  ld (0x58c0),a
+- ld (0xf1c0),a
+- ret
+-led_frame_lower:
+- ld a,0x42
++ ld (0x5980),a
+  ld (0x5a40),a
++ ld (0xf1c0),a
++ ld (0xf280),a
+  ld (0xf340),a
+  ret
++; NZ si algun enemigo vivo (no en explosion ni reagrupado) esta en y>=112.
++led_danger:
++ ld hl,enemy_slots+1
++ ld b,6
++led_danger_loop:
++ ld a,(hl)
++ cp 112
++ jr c,led_danger_next
++ inc hl
++ ld a,(hl)
++ dec hl
++ or a
++ jr z,led_danger_next
++ cp 3
++ jr z,led_danger_next
++ cp 5
++ ret nz
++led_danger_next:
++ ld de,6
++ add hl,de
++ djnz led_danger_loop
++ xor a
++ ret
+ rush_rest_ticks: db 0
+ rush_pause_active: db 0
+ rush_hover_found: db 0
+@@ -1901,7 +1967,7 @@
+  ret nc
+  ld (ix+1),a
+  ld (ix+2),1
+- call beep_enemy_fire
++ call sfx_enemy_fire
+  ret
+ 
+ hunter_pair_completion:
+@@ -2150,39 +2216,16 @@
+  ld (spr_height),a
+  jp sprite_render
+ enemy_draw_explosion:
+- ; A 16x16-looking two-part detonation: center spark plus alternating debris.
+- ; All masks come from the old trusted 8x8 explosion sprite, no VRAM erasure.
+- ld hl,explosion_phase_ptrs
+- ld (spr_data),hl
+- ld a,(ix+0)
+- add a,4
+- ld (spr_x),a
+- ld a,(ix+1)
+- add a,4
+- ld (spr_y),a
+- ld a,2
+- ld (spr_cols),a
+- ld a,8
+- ld (spr_height),a
+- call sprite_render
++ ; V1.2: explosion de 16x16 en tres tiempos (destello, estallido, chispas).
++ ; Las fases desplazadas se generan al arrancar en $5B00 (explosion_shift_init).
+  ld a,(ix+5)
++ ld hl,explosion_phase_ptrs_f0
++ cp 5
++ jp nc,enemy_kind_ready
++ ld hl,explosion_phase_ptrs_f1
+  cp 3
+- ret c                        ; Last two updates fade to one central spark.
+- and 1
+- jr z,enemy_blast_second_corner
+- ld a,(ix+0)
+- ld (spr_x),a
+- ld a,(ix+1)
+- ld (spr_y),a
+- jp sprite_render
+- enemy_blast_second_corner:
+- ld a,(ix+0)
+- add a,8
+- ld (spr_x),a
+- ld a,(ix+1)
+- add a,8
+- ld (spr_y),a
+- jp sprite_render
++ jp nc,enemy_kind_ready
++ ld hl,explosion_phase_ptrs_f2
+ enemy_kind_ready:
+  ld (spr_data),hl
+  ld a,(ix+0)
+@@ -2238,7 +2281,7 @@
+  ld (iy+5),6             ; Six visible blast updates (~0.25s at 25Hz).
+  ld (ix+2),0
+  call score_add_kill     ; V1.1: marcador de 16 bits y vida extra.
+- call beep_enemy_destroy
++ call sfx_explode
+  jp bullet_check_done
+ bullet_no_hit:
+  ld de,6
+@@ -2266,6 +2309,9 @@
+  jp z,bullet_next
+  dec a
+  ld (boss_hp),a
++ push af
++ call boss_damage_check     ; V1.2: grietas al bajar a 12, 6 y 3.
++ pop af
+  jr nz,boss_bullet_hit_score
+  ; MOAI defeated: neutralize all remaining eye shots immediately.
+  xor a
+@@ -2274,7 +2320,7 @@
+  ld (enemy_bullet_slots+8),a
+ boss_bullet_hit_score:
+  call score_add_kill
+- call beep_enemy_destroy
++ call sfx_boss_hit
+  jp bullet_next
+ bullet_next:
+  ld de,3
+@@ -2298,6 +2344,8 @@
+ bullet_draw_ix:
+  ; V1.1: dibujo OR directo de 2x4 bytes (mismo resultado que sprite_render
+  ; con shot_phase_ptrs, sin pasar por las variables spr_*).
++ ld bc,shot_phase_ptrs       ; V1.2: haz propio; los enemigos usan el rombo
++bullet_draw_with:
+  call bullet_rect_dest       ; DE = pantalla; NC = inactivo o no cabe
+  ret nc
+  ld a,(ix+0)
+@@ -2305,7 +2353,6 @@
+  add a,a
+  ld l,a
+  ld h,0
+- ld bc,shot_phase_ptrs
+  add hl,bc
+  ld a,(hl)
+  inc hl
+@@ -2319,70 +2366,7 @@
+ 
+  ; Four rightmost score digits: kills x 10, up to 2550 without overflow.
+  ; This runs only on a kill and writes the *native* HUD bitmap in screen RAM.
+-score_draw:
+- ; V1.1: puntos = score_words*10 (antes un byte: a los 2.560 puntos volvia a 0).
+- call score_to_digits
+- ld a,(score_digits)
+- ld e,26
+- call score_digit_draw
+- ld a,(score_digits+1)
+- ld e,27
+- call score_digit_draw
+- ld a,(score_digits+2)
+- ld e,28
+- call score_digit_draw
+- ld a,(score_digits+3)
+- ld e,29
+- call score_digit_draw
+- xor a
+- ld e,30
+- call score_digit_draw
+- ret
+-score_digit_draw:
+- push af
+- ld a,e
+- ld (score_tile_x),a
+- pop af
+- ld hl,digit_bitmaps
+- or a
+- jp z,score_glyph_ready
+- ld b,a
+- ld de,7
+-score_seek_glyph:
+- add hl,de
+- djnz score_seek_glyph
+-score_glyph_ready:
+- ld (score_glyph),hl
+- ld a,24
+- ld (score_row),a
+-score_digit_row:
+- ld a,(score_row)
+- ld l,a
+- ld h,0
+- add hl,hl
+- ld de,scanline_table
+- add hl,de
+- ld e,(hl)
+- inc hl
+- ld d,(hl)
+- ex de,hl
+- ld a,(score_tile_x)
+- ld c,a
+- ld b,0
+- add hl,bc
+- ld de,(score_glyph)
+- ld a,(de)
+- ld (hl),a
+- inc de
+- ex de,hl
+- ld (score_glyph),hl
+- ld a,(score_row)
+- inc a
+- ld (score_row),a
+- cp 31
+- jp nz,score_digit_row
+- ret
+-
++; V1.2: score_draw esta en src/v12_hud.asm (cifras gruesas + record).
+ ; Six original GRIT-style 5px digits, horizontal pixel positions 9,17,...49.
+ ; Pixel bits 6..2 align within tile from x%8==1, no border touching.
+ digit_bitmaps:
+@@ -2446,17 +2430,6 @@
+ kills: db 0
+ wave_done: db 0
+ wave_stage: db 0             ; 0 formation, 1 fast hunters, 2 kamikaze sweeps.
+-ship_flame_attr: db 70
+-enemy_attr: db 71
+-score_remainder: db 0
+-score_tile_x: db 0
+-score_row: db 0
+-score_glyph: dw 0
+-box_x: db 0
+-box_y: db 0
+-box_current_y: db 0
+-box_rows: db 0
+-box_action: db 0
+ ; spr_* scratch is allocated by arcade_xor_fast.asm
+ enemy_slots: ds 36
+ bullet_slots: ds 27
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' HALCONES_ESTELARES_CODIGO_FUENTE_1_1/src/main.asm hal/src/main.asm
+--- V1_1/src/main.asm	2026-11-12 00:05:40.151083240 +0100
++++ V1_2/src/main.asm	2026-11-12 01:48:12.723902364 +0100
+@@ -8,6 +8,7 @@
+  xor a
+  out (0xfe),a
+  call v11_boot_clear        ; V1.1: variables nuevas a cero ($F001..$F0FF).
++ call explosion_shift_init  ; V1.2: fases de la explosion nueva en $5B00.
+  call irq_im2_install       ; Install an isolated Z80 IM2 interrupt; no ROM keyboard/FRAMES writes.
+  ld a,0xa5                 ; A = sentinel for first free byte after the sky buffer ($EFFF).
+  ld (0xf000),a             ; Detect compositor writes beyond $EFFF on next game tick.
+@@ -75,7 +76,10 @@
+ 
+ ; Fetch native HUD bitmap into shadow (8 bytes / Spectrum scanline).
+ hud_install:
+- ld hl,hud_bitmap_data
++ ld hl,hud_lz               ; V1.2: HUD comprimido; se descomprime en la imagen
++ ld de,0xc000               ; de trabajo (aun libre) y se copia como siempre.
++ call lz_unpack
++ ld hl,0xc000
+  ld (hud_source),hl
+  xor a
+ hud_bitmap_row:
+@@ -101,7 +105,7 @@
+  cp 192
+  jp nz,hud_bitmap_row
+  ; Attributes laid out row-major 8 columns; screen total width 32.
+- ld hl,hud_attr_data
++ ld hl,0xc000+1536
+  ld de,0x5818
+  ld b,24
+ hud_attr_row:
+@@ -123,7 +127,7 @@
+ ; Clobbers: AF,BC,DE,HL. All reads from compiled immutable Z80 tables.
+ ; Crucially called BEFORE compositor_init, so C000 and D800 snapshot the rail.
+ frame_install:
+- ld hl,0x7bc0                  ; V2.8 immutable 384-byte left frame from low RAM sprite CODE block.
++ ld hl,frame_bitmap_low        ; V1.2 (antes $7BC0) immutable 384-byte left frame from low RAM sprite CODE block.
+  ld (frame_source),hl          ; Save source pointer for each of 192 non-linear scanlines.
+  xor a                         ; A = pixel row 0.
+ frame_bitmap_row:
+@@ -181,8 +185,4 @@
+ hud_y: db 0
+ star_x: db 0
+ star_y: db 0
+-star_rate: db 0
+-plot_mode: db 0
+ frame_index: db 0
+-ship_ptr: dw 0
+-ship_scan_y: db 0
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' HALCONES_ESTELARES_CODIGO_FUENTE_1_1/src/phase_interlude_v24.asm hal/src/phase_interlude_v24.asm
+--- V1_1/src/phase_interlude_v24.asm	2026-11-12 00:05:40.151094558 +0100
++++ V1_2/src/phase_interlude_v24.asm	2026-11-12 01:46:39.198237217 +0100
+@@ -7,14 +7,18 @@
+ phase_interlude_enter:
+  call phase_screen_show
+  call phase_number_draw
++ call phase_stats_draw      ; V1.2: puntos, vidas y record.
+  di                         ; Atomic 16-bit IRQ timer initialization.
+  ld hl,150
+  ld (gameover_timer),hl
+  ld a,2
+  ld (gameover_mode),a
+  ei
++ ld hl,tune_victory         ; V1.2: fanfarria de victoria
++ ld de,0
++ call music_start
+ phase_interlude_wait:
+- halt                       ; Absolutely no SPACE input during interlude.
++ call music_frame           ; V1.2: (antes HALT) sin leer mandos.
+  ld hl,(gameover_timer)
+  ld a,h
+  or l
+@@ -30,19 +34,12 @@
+  call stars_v13_draw_all      ; Restore all 32 star pixels erased by scene sync.
+  call stars_v13_present_initial ; Keep visible star state identical to work.
+  call color_shadow_init      ; Restore private attribute palette from real VRAM.
+- ld a,255                    ; Force the saved HUD values back into new bitmap.
+- ld (lives_displayed),a
+- ld (shield_meter_displayed),a
+- call lives_hud_present
+- call shield_bar_present
+- call score_draw             ; Kills persist, do not reset score or lives.
+- ret
++ jp hud_draw_all             ; V1.2: marcador completo (puntos, caras, escudo, fase).
+ 
+ phase_screen_show:
+- ld hl,phase_rle_data
++ ld hl,phase_lz              ; V1.2: comprimida LZ.
+  ld de,0x4000
+- call title_unpack_next      ; Reuse ROM-free byte-exact screen unpacker.
+- ret
++ jp lz_unpack
+ 
+ phase_number_draw:
+  ; Decimal 01..99, rendered using the exact native Z80 digit blitter.
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' HALCONES_ESTELARES_CODIGO_FUENTE_1_1/src/sound_v19.asm hal/src/sound_v19.asm
+--- V1_1/src/sound_v19.asm	2026-11-12 00:05:40.151101868 +0100
++++ V1_2/src/sound_v19.asm	2026-11-12 01:46:39.198769206 +0100
+@@ -20,18 +20,6 @@
+  dec c
+  jr nz,beep_enemy_blip_cycle
+  ret
+-beep_shield_contact:
+- ld c,38                   ; Low electric shield collision pulse.
+- jr sfx_two_ticks
+-beep_shield_activate:
+- ld c,54                   ; Swell pulse for the 3-second field.
+- jr sfx_two_ticks
+-beep_enemy_fire:
+- ld c,12                   ; Short dry enemy pew.
+- jr sfx_two_ticks
+-beep_boss_fire:
+- ld c,75                   ; Deep MOAI eye cannon.
+- jr sfx_two_ticks
+ beep_player_death:
+  ; V2.3: short audible PFF burst of fast pseudo-random EAR flips, not a melody.
+  ; 16 * 190 samples of variable FE bit4 = about 45 ms at 3.5 MHz.
+@@ -56,14 +44,6 @@
+  out (0xfe),a
+  pop de
+  ret
+-beep_shield_ready:
+- ld c,10                   ; Tiny high-pitched recharged bell.
+- jr sfx_two_ticks
+-beep_boss_intro:
+- ld c,110                  ; Heavy two-note warning, boss arrives.
+- call sfx_two_ticks
+- ld c,80
+- jr sfx_two_ticks
+ beep_boss_destroy:
+  ; V2.4: deep, long ~0.20s pseudo-white-noise burst for defeated MOAI.
+  ; Stronger and LONGER than ESF fighter death, but still event-triggered.
+@@ -88,15 +68,3 @@
+  out (0xfe),a
+  pop de
+  ret
+-sfx_two_ticks:
+- ld a,16                   ; Ear toggled high, border always 0.
+- out (0xfe),a
+- ld b,c
+-sfx_high:
+- djnz sfx_high
+- xor a
+- out (0xfe),a
+- ld b,c
+-sfx_low:
+- djnz sfx_low
+- ret
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' HALCONES_ESTELARES_CODIGO_FUENTE_1_1/src/title_screen.asm hal/src/title_screen.asm
+--- V1_1/src/title_screen.asm	2026-11-12 00:05:40.151125916 +0100
++++ V1_2/src/title_screen.asm	2026-11-12 01:46:39.198048794 +0100
+@@ -4,52 +4,86 @@
+ ; Assembly: uses only instructions from original Z80; no ROM print calls.
+ ;
+ ; title_screen_show: input none; output VRAM filled; destroys AF BC DE HL.
+-; title_screen_wait: input SPACE key at $7FFE; output on a fresh SPACE press.
+-; Destroys AF BC; IX/IY preserved; caller's SP must be valid.
++; title_screen_wait: input fire; output on a fresh press.
+ 
+ title_screen_show:
+- ld hl,title_rle_data          ; HL = read pointer for compressed title bytes.
+- ld de,0x4000                 ; DE = first visible bitmap byte.
+-title_unpack_next:
+- ld a,d                       ; A = high destination address byte.
+- cp 0x5b                     ; Compare with exclusive end $5B00 (6912 bytes).
+- ret z                        ; Done only when DE has reached $5B00.
+- ld a,(hl)                    ; Read next RLE byte (or literal) into A.
+- inc hl                       ; Advance compressed source pointer.
+- cp 255                       ; $FF introduces repeated-byte record.
+- jr z,title_unpack_run        ; If marker, decode COUNT + VALUE.
+- ld (de),a                    ; Copy one non-marker bitmap/attribute byte.
+- inc de                       ; Move destination by one byte.
+- jr title_unpack_next         ; Continue until complete video screen is filled.
+-title_unpack_run:
+- ld b,(hl)                    ; B = repeat count (1..255).
+- inc hl                       ; Point at the repeated value.
+- ld a,(hl)                    ; A = repeated value.
+- inc hl                       ; Point at next record.
+-title_unpack_run_loop:
+- ld (de),a                    ; Output repeated byte at destination DE.
+- inc de                       ; Advance destination pointer.
+- djnz title_unpack_run_loop  ; Repeat B times; decrements B and tests zero.
+- jr title_unpack_next         ; Decode next literal or repeat packet.
++ ld hl,title_lz                ; V1.2: pantalla comprimida LZ (ver tools/lz.py).
++ ld de,0x4000
++ ; cae en lz_unpack
++
++; V1.2 DESCOMPRESOR LZ. HL = origen, DE = destino. Formato (tools/lz.py):
++; byte C: 0 fin; 1..127 = C literales; 128..191 = copia de C-125 bytes desde
++; DE-D con D de 1 byte; 192..255 = copia de C-189 bytes con D de 2 bytes.
++; Destruye AF, BC, DE, HL.
++lz_src equ 0xf04a
++lz_unpack:
++ ld a,(hl)
++ inc hl
++ or a
++ ret z
++ jp m,lz_match
++ ld c,a
++ ld b,0
++ ldir
++ jr lz_unpack
++lz_match:
++ ld b,0
++ cp 192
++ jr nc,lz_far
++ sub 125
++ ld c,a
++ ld a,(hl)
++ inc hl
++ ld (lz_src),hl
++ ld l,a
++ ld h,b
++ jr lz_copy
++lz_far:
++ sub 189
++ ld c,a
++ ld a,(hl)
++ inc hl
++ push af
++ ld a,(hl)
++ inc hl
++ ld (lz_src),hl
++ ld h,a
++ pop af
++ ld l,a
++lz_copy:
++ push de
++ ex de,hl
++ or a
++ sbc hl,de
++ pop de
++ ldir
++ ld hl,(lz_src)
++ jr lz_unpack
+ 
+ ; Wait until SPACE is released (fresh press requirement), then pressed.
+ ; ROM ISR remains active at 50 Hz, so HALT does not spin at full speed.
+ title_screen_wait:
+  call kempston_detect          ; V1.1: hay Kempston? (bus flotante = no)
++ call title_record_draw        ; V1.2: record de la sesion
++ ld hl,tune_title              ; V1.2: melodia del titulo, en bucle
++ ld de,tune_title
++ call music_start
+  ld a,75                     ; A leisurely attract-mode baseline hold, 1.5s PAL.
+  ld (title_pulse_countdown),a
+  xor a                       ; Phase zero: display original yellow title.
+  ld (title_pulse_phase),a
+  title_wait_release:
+- halt                          ; Yield to next display interrupt (50Hz PAL).
++ call music_frame              ; V1.2: musica hasta la siguiente interrupcion.
+  call any_fire_pressed         ; V1.1: SPACE, 0 (Sinclair) o fuego Kempston.
+  jr z,title_wait_release       ; If key held at boot, require a release.
+ title_wait_press:
+- halt                          ; Wait for next display interrupt.
++ call music_frame              ; V1.2: musica hasta la siguiente interrupcion.
+  call title_pulse_tick         ; Attract mode: brief white pulse, original logo bitmap untouched.
++ call title_twinkle            ; V1.2: estrellas que titilan.
+  call any_fire_pressed
+  jr nz,title_wait_press        ; Do not start while SPACE remains unpressed.
+  call title_choose_controls    ; V1.1: fuego del Kempston = partida con joystick.
++ call music_stop               ; V1.2: silencio al empezar.
+ title_wait_start_release:
+  halt                          ; Wait until the start key is released again.
+  call any_fire_pressed
+@@ -82,35 +116,63 @@
+  add hl,de
+  ld a,(hl)
+  ld (title_pulse_countdown),a
+- ; Restore title area to its ORIGINAL 224 ZX attributes first.
+- ld hl,0x7d40
+- ld de,0x5820
+- ld bc,224
+- ldir
++ ; V1.2: se devuelven a amarillo solo las celdas que se blanquearon (mascara
++ ; de 224 bits en $F070), sin guardar una copia de 224 atributos.
++ ld hl,0x5820
++ ld de,pulse_mask
++ ld b,28
++title_pulse_restore:
++ ld a,(de)
++ ld c,8
++title_pulse_restore_bit:
++ rrca
++ jr nc,title_pulse_restore_skip
++ ld (hl),0x46
++title_pulse_restore_skip:
++ inc hl
++ dec c
++ jr nz,title_pulse_restore_bit
++ xor a
++ ld (de),a
++ inc de
++ djnz title_pulse_restore
+  ; Only white-highlight phases 1 & 3; phase 0/2 are the original.
+  ld a,(title_pulse_phase)
+  and 1
+  jr z,title_pulse_done
+  ld hl,0x5820
+- ld bc,224
+- title_pulse_recolor:
++ ld de,pulse_mask
++ ld b,28
++title_pulse_white:
++ push bc
++ ld bc,0x0100               ; C = mascara del byte, B = bit en curso
++title_pulse_white_bit:
+  ld a,(hl)
+  and 7
+  cp 6                           ; Original bright-yellow INK only.
+- jr nz,title_pulse_next
++ jr nz,title_pulse_white_next
+  ld (hl),0x47                 ; Change ink to bright WHITE on black.
+- title_pulse_next:
++ ld a,c
++ or b
++ ld c,a
++title_pulse_white_next:
+  inc hl
+- dec bc
+  ld a,b
+- or c
+- jr nz,title_pulse_recolor
++ add a,a
++ ld b,a
++ jr nz,title_pulse_white_bit
++ ld a,c
++ ld (de),a
++ inc de
++ pop bc
++ djnz title_pulse_white
+  title_pulse_done:
+  pop hl
+  pop de
+  pop bc
+  pop af
+  ret
++ pulse_mask equ 0xf070
+  title_pulse_times: db 75,6,9,3
+  title_pulse_countdown: db 75
+  title_pulse_phase: db 0
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' HALCONES_ESTELARES_CODIGO_FUENTE_1_1/src/v11_bajo.asm hal/src/v11_bajo.asm
+--- V1_1/src/v11_bajo.asm	2026-11-12 00:05:40.151163087 +0100
++++ V1_2/src/v11_bajo.asm	2026-11-12 01:46:39.196958107 +0100
+@@ -1,8 +1,5 @@
+-; HALCONES ESTELARES 1.1 - RUTINAS FRIAS EN MEMORIA BAJA ($7E20..$7FFF).
+-; Se cargan junto a los sprites reubicados. Solo JP/CALL hacia el bloque
+-; principal (las direcciones las inyecta build.py). Codigo poco frecuente:
+-; arranque, titulo, pausa, marcador, cartel de oleada y tablas.
+-
++; HALCONES ESTELARES 1.2 - bloque de codigo en memoria baja (vacio: la
++; memoria baja se usa para graficos). build.py sigue admitiendo codigo aqui.
+ 
+ ; Kempston solo si 256 lecturas seguidas tienen los bits 5..7 a cero y nunca
+ ; izquierda+derecha a la vez (sin interfaz el bus flotante da $FF).
+@@ -63,234 +60,259 @@
+  ld (kempston_mode),a
+  ret
+ 
+-; H = pausa. Borde azul; el IM2 deja quietos escudo, invulnerabilidad y
+-; reagrupamientos. Otra pulsacion de H continua.
+-pause_check:
+- ld bc,0xbffe
+- in a,(c)
+- and 16
+- jr z,pc_down
+- xor a
+- ld (pause_held),a
+- ret
+-pc_down:
+- ld a,(pause_held)
+- or a
+- ret nz
+- ld a,1
+- ld (pause_held),a
+- ld (game_paused),a
+- ld a,1
+- out (0xfe),a
+-pc_wait_release:
+- halt
+- ld bc,0xbffe
+- in a,(c)
+- and 16
+- jr z,pc_wait_release
+-pc_wait_press:
+- halt
+- ld bc,0xbffe
+- in a,(c)
+- and 16
+- jr nz,pc_wait_press
+- xor a
+- out (0xfe),a
+- ld (game_paused),a
+- ld (tick_irqs),a
+- ret
+ 
+-; ---------------------------------------------------------------------------
+-; MARCADOR DE 16 BITS Y VIDA EXTRA
+-; score_words cuenta impactos (puntos/10) hasta 9999 = 99.990 puntos.
+-; Cada 100 impactos (1.000 puntos) se gana una vida, si quedan menos de 3.
+-score_add_kill:
+- ld a,(kills)               ; Byte historico (sin uso para el marcador).
+- inc a
+- ld (kills),a
+- ld hl,(score_words)
+- ld de,9999
+- or a
+- sbc hl,de
+- jr nc,sak_counted
++
++
++
++; TITULO: record de la sesion y estrellas que titilan.
++title_record_draw:
++ call record_digits
++ ld a,153
++ ld c,16
++ jp digits6_draw
++twk_i equ 0xf04c
++twk_c equ 0xf04d
++title_twinkle:
++ ld a,(twk_c)
++ add a,29
++ ld (twk_c),a
++ and 0x18
++ rrca
++ rrca
++ rrca
++ ld e,a
++ ld d,0
++ ld hl,twinkle_attrs
+  add hl,de
+- inc hl
+- ld (score_words),hl
+-sak_counted:
+- ld a,(life_next)
++ ld b,(hl)
++ ld a,(twk_i)
+  inc a
+- cp 100
+- jr c,sak_store
+- ld a,(player_lives)
+- or a
+- jr z,sak_reset             ; Ya sin vidas: no se resucita en la explosion final.
+- cp 3
+- jr nc,sak_reset
+- inc a
+- ld (player_lives),a        ; lives_hud_present dibuja la sonrisa nueva.
+- call beep_shield_ready
+- call beep_shield_ready
+-sak_reset:
++ cp title_star_count
++ jr c,title_twinkle_store
+  xor a
+-sak_store:
+- ld (life_next),a
+- jp score_draw
+-
+-; score_words -> 4 cifras en score_digits. Destruye AF, BC, DE, HL.
+-score_to_digits:
+- ld hl,(score_words)
+- ld de,1000
+- call sd_div
+- ld (score_digits),a
+- ld de,100
+- call sd_div
+- ld (score_digits+1),a
+- ld de,10
+- call sd_div
+- ld (score_digits+2),a
+- ld a,l
+- ld (score_digits+3),a
+- ret
+-sd_div:
+- ld b,0
+-sd_loop:
+- or a
+- sbc hl,de
+- jr c,sd_done
+- inc b
+- jr sd_loop
+-sd_done:
++title_twinkle_store:
++ ld (twk_i),a
++ add a,a
++ ld l,a
++ ld h,0
++ ld de,title_star_cells
+  add hl,de
++ ld e,(hl)
++ inc hl
++ ld d,(hl)
+  ld a,b
++ ld (de),a
+  ret
++twinkle_attrs: db 0x47,0x07,0x45,0x01
+ 
+-; ---------------------------------------------------------------------------
+-; CARTEL "OLEADA n" (1..6) ANTES DE CADA FORMACION
+-; Se escribe en la imagen de trabajo (C000) y en pantalla, fila 11 (y=88..94),
+-; columnas 9..16, en amarillo brillante. Al acabar se repone el cielo (D800).
+-wave_card_start:
+- ld a,card_len
+- ld (card_ticks),a
+- ld a,(wave_stage)
+- add a,a
+- ld b,a
+- ld a,(wave_repeat)
+- add a,b
+- inc a
+- ld (card_wave),a
+- ld a,0x46
+- jp wave_card_attr
+-
+-wave_card_tick:
+- ld a,(card_ticks)
+- dec a
+- ld (card_ticks),a
+- jr z,wave_card_end
+- ret
+ 
+-; Tras componer la imagen: redibuja el texto (estrellas y disparos lo pisan)
+-; en trabajo y pantalla a la vez, asi ambas coinciden al acabar cada tick.
+-card_draw:
+- ld a,(card_ticks)
++; FASE SUPERADA: puntos, vidas y record.
++phase_stats_draw:
++ call score_digits6
++ ld a,136
++ ld c,16
++ call digits6_draw
++ ld a,(player_lives)
++ ld (hud_buf),a
++ ld a,144
++ ld c,8
++ ld b,1
++ ld hl,hud_buf
++ call digits_n_draw
++ call record_digits
++ ld a,144
++ ld c,17
++ jp digits6_draw
++; GAME OVER: record y, si se ha batido en esta partida, NUEVO RECORD.
++gameover_record_draw:
++ call record_digits
++ ld a,161
++ ld c,16
++ call digits6_draw
++ ld a,(new_record)
+  or a
+  ret z
+- ld hl,card_glyphs
+- ld e,0x69                  ; Columna 9 de la fila de pixel 88.
+- ld c,7
+-wct_loop:
+- ld a,(hl)
++ ld hl,0x5800+17*32
++ ld b,32
++gameover_record_attr:
++ ld (hl),0xc6
+  inc hl
+- push hl
+- ld h,(hl)
+- ld l,a
+- call card_glyph
+- pop hl
++ djnz gameover_record_attr
++ ret
++; Marca si los puntos de esta partida superan el record con que empezo.
++record_check:
++ xor a
++ ld (new_record),a
++ ld hl,(record_start)
++ ld de,(score_words)
++ or a
++ sbc hl,de
++ ret nc
++ ld a,1
++ ld (new_record),a
++ ret
++
++; FASE nn (cifras negras sobre la banda magenta), seis casillas de oleada y
++; la cifra de OLEADA n.
++hud_phase_draw:
++ ld a,(phase_number)
++ ld c,0
++hud_phase_div:
++ cp 10
++ jr c,hud_phase_digits
++ sub 10
++ inc c
++ jr hud_phase_div
++hud_phase_digits:
++ ld (hud_tmp),a
++ ld a,c
++ ld c,29
++ ld e,90
++ call hud_s5
++ ld a,(hud_tmp)
++ ld c,30
++ ld e,90
++ call hud_s5
++ ld a,(card_wave)
++ ld c,30
++ ld e,107
++ call hud_s5
++ ld c,26
++ xor a
++ ld (face_k),a
++hud_pip_col:
++ ld a,(face_k)
++ call pip_pattern
++ ex de,hl
++ ld hl,hud_buf
++ ld b,5
++hud_pip_left:
++ ld a,(de)
++ rlca
++ rlca
++ rlca
++ rlca
++ ld (hl),a
++ inc de
++ inc hl
++ djnz hud_pip_left
++ ld a,(face_k)
++ inc a
++ call pip_pattern
++ ld de,hud_buf
++ ld b,5
++hud_pip_right:
++ ld a,(de)
++ or (hl)
++ ld (de),a
++ inc de
+  inc hl
+- dec c
+- jr nz,wct_loop
+- ld a,(card_wave)           ; La cifra sale de la fuente del marcador.
++ djnz hud_pip_right
++ ld a,1
++ ld (hp_stride),a
++ ld hl,hud_buf
++ ld b,5
++ ld a,99
++ call hud_put
++ ld a,(face_k)
++ add a,2
++ ld (face_k),a
++ inc c
++ ld a,c
++ cp 29
++ jr nz,hud_pip_col
++ ret
++; A = casilla 0..5 -> HL = dibujo (llena si es de una oleada ya empezada).
++pip_pattern:
++ ld b,a
++ ld a,(card_wave)
++ ld hl,pip_full
++ cp b
++ jr z,pip_hollow_sel
++ ret nc
++pip_hollow_sel:
++ ld hl,pip_hollow
++ ret
++pip_full: db 14,14,14,14,14
++pip_hollow: db 14,10,10,10,14
++; A = cifra, C = columna, E = linea: cifra 5x5.
++hud_s5:
++ push de
+  ld l,a
+  ld h,0
+  ld d,h
+- ld b,l
+- add hl,hl
++ ld e,l
+  add hl,hl
+  add hl,hl
+- ld a,l
+- sub b
+- ld l,a                     ; HL = cifra*7 (cabe en un byte)
+- ld bc,digit_bitmaps
+- add hl,bc
+- call card_glyph
+- ret
++ add hl,de
++ ld de,hud_s5_digits
++ add hl,de
++ ld a,1
++ ld (hp_stride),a
++ pop de
++ ld a,e
++ ld b,5
++ jp hud_put
+ 
+-wave_card_end:
+- ld hl,0xe069               ; Cielo inmutable de esas 7 filas -> trabajo y pantalla.
+- ld b,7
+-wce_row:
++; V1.2: color de los rombos de plasma enemigos en la sombra de atributos.
++; Primero se devuelven a blanco las celdas magenta de las posiciones viejas y
++; luego se pintan de magenta las nuevas, pero solo sobre celdas blancas: un
++; enemigo o la nave conservan su color. Cerca de la nave (y>=136) no se pinta.
++enemy_bullet_colors:
++ ld ix,old_enemy_bullets
++ ld de,0x4703               ; si es magenta oscuro (E) -> blanco (D)
++ call ebc_list
++ ld ix,enemy_bullet_slots
++ ld de,0x0347               ; si es blanco -> magenta oscuro (no brillante:
++                            ; distinto del MOAI, que es magenta brillante 0x43)
++ebc_list:
++ ld b,3
++ebc_loop:
+  push bc
+- push hl
+- ld b,8
+-wce_col:
+- ld a,(hl)
+- ld e,a
+- ld a,h
+- sub 0x18
+- ld d,a                     ; D = fila en C000..
++ ld a,(ix+2)
++ or a
++ jr z,ebc_next
++ ld a,(ix+1)
++ cp 136
++ jr c,ebc_paint
+  ld a,e
+- ld e,l
+- ld (de),a
+- res 7,d                    ; .. y en la pantalla (4000..)
+- ld (de),a
+- inc l
+- djnz wce_col
+- pop hl
+- inc h
+- pop bc
+- djnz wce_row
+- ld a,0x47
+- call wave_card_attr
+- jp wave_spawn_now
+-
+-; A = atributo para las 8 celdas del cartel. Se escribe en la sombra privada;
+-; card_attr_present lo pasa a la pantalla despues del color de los sprites.
+-wave_card_attr:
+- ld hl,0xf269
+- ld b,8
+-wca_loop:
+- ld (hl),a
++ cp 0x47
++ jr z,ebc_next             ; abajo solo se borra, no se pinta
++ebc_paint:
++ ld a,(ix+1)
++ and 0xf8
++ ld l,a
++ ld h,0
++ add hl,hl
++ add hl,hl
++ ld a,(ix+0)
++ rrca
++ rrca
++ rrca
++ and 31
++ ld c,a
++ ld b,0
++ add hl,bc
++ ld bc,0xf100
++ add hl,bc
++ call ebc_cell
+  inc hl
+- djnz wca_loop
+- ret
+-card_attr_present:
+- ld hl,0xf269
+- ld de,0x5969
+- ld bc,8
+- ldir
++ call ebc_cell
++ ld bc,31
++ add hl,bc
++ call ebc_cell
++ inc hl
++ call ebc_cell
++ebc_next:
++ ld bc,3
++ add ix,bc
++ pop bc
++ djnz ebc_loop
+  ret
+-
+-; HL = 7 bytes de la letra, E = byte bajo (0x60+columna). Conserva C y E.
+-card_glyph:
+- ld d,0x48
+- ld b,7
+-cg_row:
++ebc_cell:
+  ld a,(hl)
+- ld (de),a
+- set 7,d
+- ld (de),a
+- res 7,d
+- inc hl
+- inc d
+- djnz cg_row
+- inc e
++ cp e
++ ret nz
++ ld (hl),d
+  ret
+ 
+-card_glyphs:
+- dw glyph_o,glyph_l,glyph_e,glyph_a,glyph_d,glyph_a,glyph_sp
+-glyph_o: db 56,68,68,68,68,68,56
+-glyph_l: db 64,64,64,64,64,64,124
+-glyph_e: db 124,64,64,120,64,64,124
+-glyph_a: db 56,68,68,124,68,68,68
+-glyph_d: db 120,68,68,68,68,68,120
+-glyph_sp: db 0,0,0,0,0,0,0
+-
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' HALCONES_ESTELARES_CODIGO_FUENTE_1_1/src/v11_controles.asm hal/src/v11_controles.asm
+--- V1_1/src/v11_controles.asm	2026-11-12 00:05:40.151154581 +0100
++++ V1_2/src/v11_controles.asm	2026-11-12 01:46:39.196540617 +0100
+@@ -89,14 +89,15 @@
+  ld a,(tick_irqs)
+  cp tick_frames
+  jr nc,tick_go
++ ld e,a
+  ei
+- halt
++ call snd_slice              ; V1.2: el efecto suena en el tiempo que sobra.
+  jr tick_wait
+ tick_go:
+  xor a
+  ld (tick_irqs),a
+  ei
+- ret
++ jp snd_tick                 ; V1.2: barrido y segmentos del efecto, 1 vez por tick.
+ 
+ ; IM2 (guarda AF y HL el llamador).
+ grace_irq_tick:
+@@ -114,6 +115,8 @@
+  ld bc,254
+  ld (hl),0
+  ldir
++ ld a,0x5a                   ; V1.2: semilla del ruido del beeper (no puede ser 0).
++ ld (snd_rng),a
+  ret
+ 
+ ; Ticks (a 25/s) entre disparos enemigos: cuervos, cazadores, kamikazes, MOAI.
+@@ -121,3 +124,240 @@
+ fire_period_first: db 80,64,32,48
+ fire_period_later: db 64,48,20,28
+ 
++
++; ---- V1.2: rutinas que en la 1.1 estaban en memoria baja ----
++
++; ---------------------------------------------------------------------------
++; MARCADOR DE 16 BITS Y VIDA EXTRA
++; score_words cuenta impactos (puntos/10) hasta 9999 = 99.990 puntos.
++; Cada 100 impactos (1.000 puntos) se gana una vida, si quedan menos de 3.
++score_add_kill:
++ ld a,(kills)               ; Byte historico (sin uso para el marcador).
++ inc a
++ ld (kills),a
++ ld hl,(score_words)
++ ld de,9999
++ or a
++ sbc hl,de
++ jr nc,sak_counted
++ add hl,de
++ inc hl
++ ld (score_words),hl
++sak_counted:
++ ld a,(life_next)
++ inc a
++ cp 100
++ jr c,sak_store
++ ld a,(player_lives)
++ or a
++ jr z,sak_reset             ; Ya sin vidas: no se resucita en la explosion final.
++ cp 3
++ jr nc,sak_reset
++ inc a
++ ld (player_lives),a        ; lives_hud_present dibuja la sonrisa nueva.
++ call sfx_life                ; V1.2: arpegio de vida extra
++sak_reset:
++ xor a
++sak_store:
++ ld (life_next),a
++ jp score_draw
++
++; score_words -> 4 cifras en score_digits. Destruye AF, BC, DE, HL.
++score_to_digits:
++ ld hl,(score_words)
++ ld de,1000
++ call sd_div
++ ld (score_digits),a
++ ld de,100
++ call sd_div
++ ld (score_digits+1),a
++ ld de,10
++ call sd_div
++ ld (score_digits+2),a
++ ld a,l
++ ld (score_digits+3),a
++ ret
++sd_div:
++ ld b,0
++sd_loop:
++ or a
++ sbc hl,de
++ jr c,sd_done
++ inc b
++ jr sd_loop
++sd_done:
++ add hl,de
++ ld a,b
++ ret
++
++; ---------------------------------------------------------------------------
++; CARTEL "OLEADA n" (1..6) ANTES DE CADA FORMACION
++; Se escribe en la imagen de trabajo (C000) y en pantalla, fila 11 (y=88..94),
++; columnas 9..16, en amarillo brillante. Al acabar se repone el cielo (D800).
++wave_card_start:
++ ld a,card_len
++ ld (card_ticks),a
++ ld a,(wave_stage)
++ add a,a
++ ld b,a
++ ld a,(wave_repeat)
++ add a,b
++ inc a
++ ld (card_wave),a
++ call hud_phase_draw         ; V1.2: casillas de oleada y numero en el marcador.
++ call sfx_card
++ ld a,0x46
++ jp wave_card_attr
++
++wave_card_tick:
++ ld a,(card_ticks)
++ dec a
++ ld (card_ticks),a
++ jr z,wave_card_end
++ ret
++
++; Tras componer la imagen: redibuja el texto (estrellas y disparos lo pisan)
++; en trabajo y pantalla a la vez, asi ambas coinciden al acabar cada tick.
++card_draw:
++ ld a,(card_ticks)
++ or a
++ ret z
++ ld hl,card_glyphs
++ ld e,0x69                  ; Columna 9 de la fila de pixel 88.
++ ld c,7
++wct_loop:
++ ld a,(hl)
++ inc hl
++ push hl
++ ld h,(hl)
++ ld l,a
++ call card_glyph
++ pop hl
++ inc hl
++ dec c
++ jr nz,wct_loop
++ ld a,(card_wave)           ; La cifra sale de la fuente del marcador.
++ ld l,a
++ ld h,0
++ ld d,h
++ ld b,l
++ add hl,hl
++ add hl,hl
++ add hl,hl
++ ld a,l
++ sub b
++ ld l,a                     ; HL = cifra*7 (cabe en un byte)
++ ld bc,digit_bitmaps
++ add hl,bc
++ call card_glyph
++ ret
++
++wave_card_end:
++ ld hl,0xe069               ; Cielo inmutable de esas 7 filas -> trabajo y pantalla.
++ ld b,7
++wce_row:
++ push bc
++ push hl
++ ld b,8
++wce_col:
++ ld a,(hl)
++ ld e,a
++ ld a,h
++ sub 0x18
++ ld d,a                     ; D = fila en C000..
++ ld a,e
++ ld e,l
++ ld (de),a
++ res 7,d                    ; .. y en la pantalla (4000..)
++ ld (de),a
++ inc l
++ djnz wce_col
++ pop hl
++ inc h
++ pop bc
++ djnz wce_row
++ ld a,0x47
++ call wave_card_attr
++ jp wave_spawn_now
++
++; A = atributo para las 8 celdas del cartel. Se escribe en la sombra privada;
++; card_attr_present lo pasa a la pantalla despues del color de los sprites.
++wave_card_attr:
++ ld hl,0xf269
++ ld b,8
++wca_loop:
++ ld (hl),a
++ inc hl
++ djnz wca_loop
++ ret
++card_attr_present:
++ ld hl,0xf269
++ ld de,0x5969
++ ld bc,8
++ ldir
++ ret
++
++; HL = 7 bytes de la letra, E = byte bajo (0x60+columna). Conserva C y E.
++card_glyph:
++ ld d,0x48
++ ld b,7
++cg_row:
++ ld a,(hl)
++ ld (de),a
++ set 7,d
++ ld (de),a
++ res 7,d
++ inc hl
++ inc d
++ djnz cg_row
++ inc e
++ ret
++
++card_glyphs:
++ dw glyph_o,glyph_l,glyph_e,glyph_a,glyph_d,glyph_a,glyph_sp
++glyph_o: db 56,68,68,68,68,68,56
++glyph_l: db 64,64,64,64,64,64,124
++glyph_e: db 124,64,64,120,64,64,124
++glyph_a: db 56,68,68,124,68,68,68
++glyph_d: db 120,68,68,68,68,68,120
++glyph_sp: db 0,0,0,0,0,0,0
++
++
++; H = pausa. Borde azul; el IM2 deja quietos escudo, invulnerabilidad y
++; reagrupamientos. Otra pulsacion de H continua.
++pause_check:
++ ld bc,0xbffe
++ in a,(c)
++ and 16
++ jr z,pc_down
++ xor a
++ ld (pause_held),a
++ ret
++pc_down:
++ ld a,(pause_held)
++ or a
++ ret nz
++ ld a,1
++ ld (pause_held),a
++ ld (game_paused),a
++ call beep_enemy_destroy     ; V1.2: pitido de pausa
++ ld a,1
++ out (0xfe),a
++pc_wait_release:
++ halt
++ ld bc,0xbffe
++ in a,(c)
++ and 16
++ jr z,pc_wait_release
++pc_wait_press:
++ halt
++ ld bc,0xbffe
++ in a,(c)
++ and 16
++ jr nz,pc_wait_press
++ call beep_enemy_destroy
++ xor a
++ out (0xfe),a
++ ld (game_paused),a
++ ld (tick_irqs),a
++ ret
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' HALCONES_ESTELARES_CODIGO_FUENTE_1_1/src/v12_bajo.asm hal/src/v12_bajo.asm
+--- V1_1/src/v12_bajo.asm	1970-01-01 01:00:00.000000000 +0100
++++ V1_2/src/v12_bajo.asm	2026-11-12 01:52:33.473831175 +0100
+@@ -0,0 +1,460 @@
++; HALCONES ESTELARES 1.2 - MOAI CON DANO, BOCA, DERRUMBE Y LUNA (memoria baja).
++; Todo esto corre solo durante el MOAI, la escena mas ligera del juego.
++
++; Al empezar el MOAI.
++boss_v12_start:
++ xor a
++ ld (boss_blocks),a
++ ld (mouth_ticks),a
++ ld (moon_x),a
++ ld (moon_clock),a
++ ret
++
++; B = x, C = y: borra ese pixel en pantalla, imagen de trabajo y cielo.
++boss_pixel_clear:
++ ld l,c
++ ld h,0
++ add hl,hl
++ ld de,scanline_table
++ add hl,de
++ ld e,(hl)
++ inc hl
++ ld d,(hl)
++ ld a,b
++ rrca
++ rrca
++ rrca
++ and 31
++ add a,e
++ ld e,a
++ ld a,b
++ and 7
++ ld l,a
++ ld h,0
++ push de
++ ld de,bitmask_table
++ add hl,de
++ ld a,(hl)
++ cpl
++ ld c,a
++ pop hl
++ and (hl)
++ ld (hl),a                 ; pantalla
++ ld a,h
++ add a,0x80
++ ld h,a
++ ld a,c
++ and (hl)
++ ld (hl),a                 ; trabajo C000
++ ld a,h
++ add a,0x18
++ ld h,a
++ ld a,c
++ and (hl)
++ ld (hl),a                 ; cielo D800
++ ret
++
++; A = vida que le queda al MOAI: grietas nuevas al bajar a 12, 6 y 3.
++boss_damage_check:
++ ld b,0
++ cp 12
++ jr z,boss_crack
++ inc b
++ cp 6
++ jr z,boss_crack
++ inc b
++ cp 3
++ ret nz
++; B = etapa 0..2: grieta de 2 px de ancho que baja serpenteando.
++boss_crack:
++ ld a,b
++ add a,a
++ add a,b
++ ld e,a
++ ld d,0
++ ld hl,crack_starts
++ add hl,de
++ ld a,(hl)
++ ld (crack_x),a
++ inc hl
++ ld a,(hl)
++ ld (crack_y),a
++ inc hl
++ ld a,(hl)
++ ld (crack_len),a
++ ld a,(frame_index)
++ ld (crack_seed),a
++bc_loop:
++ ld a,(crack_x)
++ ld b,a
++ ld a,(crack_y)
++ ld c,a
++ call boss_pixel_clear
++ ld a,(crack_x)
++ inc a
++ ld b,a
++ ld a,(crack_y)
++ ld c,a
++ call boss_pixel_clear
++ ld a,(crack_seed)
++ ld b,a
++ add a,a
++ add a,a
++ add a,b
++ add a,17
++ ld (crack_seed),a
++ rlca
++ rlca
++ and 3                     ; 0 izquierda, 1-2 recto, 3 derecha
++ ld hl,crack_x
++ or a
++ jr nz,bc_right
++ dec (hl)
++ jr bc_down
++bc_right:
++ cp 3
++ jr nz,bc_down
++ inc (hl)
++bc_down:
++ ld hl,crack_y
++ inc (hl)
++ ld hl,crack_len
++ dec (hl)
++ jr nz,bc_loop
++ ret
++crack_starts: db 98,9,24, 84,38,30, 106,44,34
++
++; El MOAI dispara: la boca se abre (franja negra) unos ticks.
++mouth_open:
++ ld a,8
++ ld (mouth_ticks),a
++ xor a
++ jr mouth_set
++mouth_close:
++ ld a,1
++mouth_set:
++ ld (mouth_mode),a
++ ld c,65
++ms_row:
++ push bc
++ ld l,c
++ ld h,0
++ add hl,hl
++ ld de,scanline_table
++ add hl,de
++ ld e,(hl)
++ inc hl
++ ld d,(hl)
++ ld a,e
++ add a,11
++ ld e,a                    ; DE = pantalla (x=88)
++ ld b,2
++ms_col:
++ ld a,(mouth_mode)
++ or a
++ jr z,ms_put               ; abrir: 0
++ ld a,d
++ add a,0x98
++ ld h,a
++ ld l,e
++ ld a,(hl)                 ; cerrar: lo que hay en el cielo
++ms_put:
++ ld (de),a
++ ld l,a
++ ld a,d
++ add a,0x80
++ ld h,a
++ ld a,l
++ ld l,e
++ ld (hl),a                 ; misma copia en la imagen de trabajo
++ inc e
++ djnz ms_col
++ pop bc
++ inc c
++ ld a,c
++ cp 68
++ jr nz,ms_row
++ ret
++
++; Cada tick con el MOAI vivo: boca y luna.
++boss_alive_tick:
++ ld a,(mouth_ticks)
++ or a
++ jr z,moon_tick
++ dec a
++ ld (mouth_ticks),a
++ call z,mouth_close
++; La luna cruza por delante de Jupiter, 1 px cada 8 ticks.
++moon_tick:
++ ld a,(moon_clock)
++ inc a
++ and 7
++ ld (moon_clock),a
++ ret nz
++ call moon_erase
++ ld a,(moon_x)
++ or a
++ jr nz,moon_next
++ ld a,23                   ; primera vez: entra por la izquierda (x=24)
++moon_next:
++ inc a
++ cp 184
++ jr c,moon_store
++ ld a,24
++moon_store:
++ ld (moon_x),a
++ call moon_draw
++ jp moon_sync
++
++; Quita la luna del cielo y repone esas filas de Jupiter.
++moon_erase:
++ ld a,(moon_x)
++ or a
++ ret z
++ ld c,moon_y
++me_row:
++ push bc
++ call moon_row_addr        ; HL = cielo (D800) en la columna de la luna
++ xor a
++ ld (hl),a
++ inc hl
++ ld (hl),a
++ ; fila de Jupiter (7 bytes en x=128) desde los datos del planeta
++ ld a,c
++ sub 96
++ ld l,a
++ ld h,0
++ ld d,h
++ ld e,l
++ add hl,hl
++ add hl,hl
++ add hl,hl
++ or a
++ sbc hl,de                 ; (y-96)*7
++ ld de,0xf611
++ add hl,de
++ push hl
++ ld l,c
++ ld h,0
++ add hl,hl
++ ld de,scanline_table
++ add hl,de
++ ld e,(hl)
++ inc hl
++ ld d,(hl)
++ ld a,e
++ add a,16
++ ld e,a
++ ld a,d
++ add a,0x98
++ ld d,a
++ pop hl
++ ld bc,7
++ ldir
++ pop bc
++ inc c
++ ld a,c
++ cp moon_y+7
++ jr nz,me_row
++ ret
++
++; C = y -> HL = byte del cielo (D800) donde empieza la luna.
++moon_row_addr:
++ ld l,c
++ ld h,0
++ add hl,hl
++ ld de,scanline_table
++ add hl,de
++ ld e,(hl)
++ inc hl
++ ld d,(hl)
++ ld a,(moon_x)
++ rrca
++ rrca
++ rrca
++ and 31
++ add a,e
++ ld l,a
++ ld a,d
++ add a,0x98
++ ld h,a
++ ret
++
++; Dibuja la luna (disco de 7 px con crateres) tapando lo que haya detras.
++moon_draw:
++ ld c,moon_y
++ ld ix,moon_art
++md_row:
++ push bc
++ call moon_row_addr
++ ld d,(ix+0)               ; disco (mascara)
++ ld e,0
++ ld b,(ix+7)               ; dibujo
++ ld c,0
++ ld a,(moon_x)
++ and 7
++ jr z,md_shifted
++md_shift:
++ push af
++ ld a,d
++ or a
++ rra
++ ld d,a
++ ld a,e
++ rra
++ ld e,a
++ ld a,b
++ or a
++ rra
++ ld b,a
++ ld a,c
++ rra
++ ld c,a
++ pop af
++ dec a
++ jr nz,md_shift
++md_shifted:
++ ld a,d
++ cpl
++ and (hl)
++ or b
++ ld (hl),a
++ inc hl
++ ld a,e
++ cpl
++ and (hl)
++ or c
++ ld (hl),a
++ inc ix
++ pop bc
++ inc c
++ ld a,c
++ cp moon_y+7
++ jr nz,md_row
++ ret
++moon_art:
++ db 0x38,0x7c,0xfe,0xfe,0xfe,0x7c,0x38   ; disco
++ db 0x38,0x5c,0xee,0xfa,0xbe,0x74,0x38   ; luna con crateres
++
++; Lleva las 7 filas de la luna del cielo a la imagen de trabajo y a la pantalla
++; (columnas 2..23). Los sprites que pasen por ahi se repintan en el tick siguiente.
++moon_sync:
++ ld c,moon_y
++msy_row:
++ push bc
++ ld l,c
++ ld h,0
++ add hl,hl
++ ld de,scanline_table
++ add hl,de
++ ld e,(hl)
++ inc hl
++ ld d,(hl)
++ inc e
++ inc e                     ; columna 2
++ ld h,d
++ ld l,e
++ ld a,h
++ add a,0x98
++ ld h,a                    ; HL = cielo
++ push de
++ push hl
++ ld a,d
++ add a,0x80
++ ld d,a                    ; DE = trabajo
++ ld bc,22
++ ldir
++ pop hl
++ pop de                    ; DE = pantalla
++ ld bc,22
++ ldir
++ pop bc
++ inc c
++ ld a,c
++ cp moon_y+7
++ jr nz,msy_row
++ ret
++
++; Derrumbe del MOAI: 3 bloques de 8x8 por tick en orden salteado (66 bloques).
++; Devuelve Z cuando ha terminado.
++boss_blocks_tick:
++ ld a,(boss_blocks)
++ or a
++ jr nz,bbt_go
++ ld a,66
++ ld (boss_blocks),a
++ xor a
++ ld (boss_bidx),a
++ call moon_erase           ; la luna se va con el MOAI
++ xor a
++ ld (moon_x),a
++bbt_go:
++ call sfx_explode
++ ld b,3
++bbt_loop:
++ push bc
++ call boss_block_erase
++ pop bc
++ ld a,(boss_blocks)
++ dec a
++ ld (boss_blocks),a
++ ret z
++ djnz bbt_loop
++ or 1                      ; NZ: quedan bloques
++ ret
++
++boss_block_erase:
++ ld a,(boss_bidx)
++ ld c,0
++bbe_div:
++ cp 6
++ jr c,bbe_ok
++ sub 6
++ inc c
++ jr bbe_div
++bbe_ok:
++ add a,9
++ ld (blk_col),a
++ ld a,c
++ add a,a
++ add a,a
++ add a,a
++ add a,8
++ ld c,a                    ; primera linea del bloque
++ ld b,8
++bbe_row:
++ push bc
++ ld l,c
++ ld h,0
++ add hl,hl
++ ld de,scanline_table
++ add hl,de
++ ld e,(hl)
++ inc hl
++ ld d,(hl)
++ ld a,(blk_col)
++ add a,e
++ ld e,a
++ xor a
++ ld (de),a                 ; pantalla
++ ld a,d
++ add a,0x80
++ ld d,a
++ xor a
++ ld (de),a                 ; trabajo
++ ld a,d
++ add a,0x18
++ ld d,a
++ xor a
++ ld (de),a                 ; cielo
++ pop bc
++ inc c
++ djnz bbe_row
++ ld a,(boss_bidx)
++ add a,37
++ cp 66
++ jr c,bbe_store
++ sub 66
++bbe_store:
++ ld (boss_bidx),a
++ ret
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' HALCONES_ESTELARES_CODIGO_FUENTE_1_1/src/v12_extras.asm hal/src/v12_extras.asm
+--- V1_1/src/v12_extras.asm	1970-01-01 01:00:00.000000000 +0100
++++ V1_2/src/v12_extras.asm	2026-11-12 01:46:39.201807954 +0100
+@@ -0,0 +1,16 @@
++; HALCONES ESTELARES 1.2 - datos del bloque de extras ($F401..$FDF9), tras el
++; MOAI, Jupiter y el GAME OVER. Solo datos (lo ensambla build.py aparte).
++; Semiperiodos (iteraciones de 26 T): C4 D4 Eb4 E4 F4 G4 Ab4 A4 Bb4 C5 D5 Eb5 E5 F5 G5 Ab5 Bb5 C6
++note_hp: dw 253,225,212,200,189,168,158,149,141,125,111,104,98,93,82,77,68,60
++; notas: 1 C4 2 D4 3 Eb4 4 E4 5 F4 6 G4 7 Ab4 8 A4 9 Bb4 10 C5 11 D5 12 Eb5
++;        13 E5 14 F5 15 G5 16 Ab5 17 Bb5 18 C6
++tune_title:
++ db 6,8, 10,8, 11,8, 12,16, 11,8, 10,8, 6,16, 7,8, 9,8, 10,16, 9,8, 7,8, 6,24, 0,8
++ db 6,8, 10,8, 11,8, 12,16, 14,8, 15,16, 14,8, 12,8, 11,16, 9,8, 10,32, 0,24
++ db 255
++tune_victory:
++ db 10,6, 13,6, 15,6, 18,18, 15,6, 18,30, 0,10, 255
++tune_gameover:
++ db 6,16, 5,16, 3,16, 2,16, 1,48, 255
++tune_record:
++ db 10,8, 13,8, 15,8, 18,8, 15,8, 18,24, 0,8, 15,6, 18,30, 255
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' HALCONES_ESTELARES_CODIGO_FUENTE_1_1/src/v12_hud.asm hal/src/v12_hud.asm
+--- V1_1/src/v12_hud.asm	1970-01-01 01:00:00.000000000 +0100
++++ V1_2/src/v12_hud.asm	2026-11-12 01:51:16.895303289 +0100
+@@ -0,0 +1,474 @@
++; HALCONES ESTELARES 1.2 - MARCADOR NUEVO (parte que cambia).
++; La parte fija (bandas, raíles, logo ESF) se descomprime en hud_install.
++; Todo se dibuja en la pantalla real (columnas 25..30), fuera del compositor.
++hud_buf equ 0xf030          ; bytes de trabajo para componer cifras
++hp_addr equ 0xf040          ; direccion de pantalla en curso (2 bytes)
++hp_stride equ 0xf042        ; avance del origen por fila (bytes)
++shield_state_shown equ 0xf043
++record_words equ 0xf046     ; record de la sesion (impactos, como score_words)
++hud_tmp equ 0xf048
++face_k equ 0xf049
++; V1.2: MOAI y luna (rutinas en src/v12_bajo.asm)
++boss_blocks equ 0xf0a0      ; bloques del MOAI que quedan por derrumbar (0 = sin empezar)
++boss_bidx equ 0xf0a1        ; bloque siguiente (0..65), avanza de 37 en 37
++mouth_ticks equ 0xf0a2      ; ticks que la boca sigue abierta
++crack_seed equ 0xf0a3
++crack_x equ 0xf0a4
++crack_y equ 0xf0a5
++crack_len equ 0xf0a6
++mouth_mode equ 0xf0a7
++moon_x equ 0xf0a8           ; x de la luna (0 = aun no dibujada)
++moon_clock equ 0xf0a9
++blk_col equ 0xf0aa
++moon_y equ 113
++
++; hud_put: copia B filas de 1 byte a la columna C desde la linea A.
++; HL = origen; avanza hp_stride por fila. Destruye AF, B, DE, HL.
++hud_put:
++ push hl
++ ld l,a
++ ld h,0
++ add hl,hl
++ ld de,scanline_table
++ add hl,de
++ ex de,hl
++ pop hl
++hud_put_row:
++ ld a,(de)
++ add a,c
++ ld (hp_addr),a
++ inc de
++ ld a,(de)
++ ld (hp_addr+1),a
++ inc de
++ push de
++ ld de,(hp_addr)
++ ld a,(hl)
++ ld (de),a
++ ld a,(hp_stride)
++ ld e,a
++ ld d,0
++ add hl,de
++ pop de
++ djnz hud_put_row
++ ret
++
++; Todo el marcador (al empezar la partida y tras la pantalla de fase).
++hud_draw_all:
++ ld a,255
++ ld (lives_displayed),a
++ ld (shield_meter_displayed),a
++ ld (shield_state_shown),a
++ call score_draw
++ call lives_hud_present
++ call shield_bar_present
++ jp hud_phase_draw
++
++; PUNTOS: "0" + 4 cifras de score_words + "0" en cifras gruesas 7x8.
++score_draw:
++ call score_to_digits
++ ld hl,score_digits
++ ld de,hud_buf+1
++ ld bc,4
++ ldir
++ xor a
++ ld (hud_buf),a
++ ld (hud_buf+5),a
++ ld a,1
++ ld (hp_stride),a
++ ld c,25
++ ld hl,hud_buf
++score_big_loop:
++ push hl
++ ld l,(hl)
++ ld h,0
++ add hl,hl
++ add hl,hl
++ add hl,hl
++ ld de,hud_big_digits
++ add hl,de
++ ld b,8
++ ld a,12
++ call hud_put
++ pop hl
++ inc hl
++ inc c
++ ld a,c
++ cp 31
++ jr nz,score_big_loop
++ ; RECORD: si los puntos lo superan, se actualiza en vivo.
++ ld hl,(score_words)
++ ld de,(record_words)
++ or a
++ sbc hl,de
++ jr c,record_draw
++ ld hl,(score_words)
++ ld (record_words),hl
++; RECORD en cifras de 3x5, dos por byte, columnas 28..30.
++record_draw:
++ call record_digits
++ ld c,28
++ ld hl,hud_buf
++record_pair_loop:
++ ld a,(hl)
++ inc hl
++ ld b,(hl)
++ inc hl
++ push hl
++ push bc
++ call nibble_pair
++ pop bc
++ ld a,1
++ ld (hp_stride),a
++ ld hl,hud_buf+8
++ ld b,5
++ ld a,26
++ call hud_put
++ pop hl
++ inc c
++ ld a,c
++ cp 31
++ jr nz,record_pair_loop
++ ret
++
++; A = cifra izquierda, B = cifra derecha -> 5 filas en hud_buf+8..+12.
++nibble_pair:
++ push bc
++ call nibble_addr
++ ld de,hud_buf+8
++ ld b,5
++nibble_left:
++ ld a,(hl)
++ rlca
++ rlca
++ rlca
++ rlca
++ ld (de),a
++ inc hl
++ inc de
++ djnz nibble_left
++ pop bc
++ ld a,b
++ call nibble_addr
++ ld de,hud_buf+8
++ ld b,5
++nibble_right:
++ ld a,(de)
++ or (hl)
++ ld (de),a
++ inc hl
++ inc de
++ djnz nibble_right
++ ret
++nibble_addr:                    ; HL = hud_nibble_digits + A*5
++ ld l,a
++ ld h,0
++ ld d,h
++ ld e,l
++ add hl,hl
++ add hl,hl
++ add hl,de
++ ld de,hud_nibble_digits
++ add hl,de
++ ret
++
++; ESCUDO: 8 segmentos; LISTO (verde parpadeante), ACTIVO (cian) o CARGANDO
++; (amarillo) con la barra en rojo-amarillo-verde mientras se recarga.
++shield_bar_present:
++ ld a,(shield_meter)
++ ld b,a
++ ld a,(shield_state)
++ ld c,a
++ ld a,(shield_meter_displayed)
++ cp b
++ jr nz,shield_bar_redraw
++ ld a,(shield_state_shown)
++ cp c
++ ret z
++shield_bar_redraw:
++ ld a,b
++ ld (shield_meter_displayed),a
++ ld a,c
++ ld (shield_state_shown),a
++ ld l,b
++ ld h,0
++ ld d,h
++ ld e,l
++ add hl,hl
++ add hl,de
++ add hl,hl
++ ld de,hud_shield_rows
++ add hl,de
++ xor a
++ ld (hp_stride),a
++ ld c,25
++shield_bar_col:
++ push hl
++ ld b,4
++ ld a,74
++ call hud_put
++ pop hl
++ inc hl
++ inc c
++ ld a,c
++ cp 31
++ jr nz,shield_bar_col
++ ld a,(shield_state)
++ ld hl,hud_txt_listo
++ ld b,0xc4
++ ld de,shield_colors_ready
++ or a
++ jr z,shield_text
++ ld hl,hud_txt_activo
++ ld b,0x45
++ ld de,shield_colors_active
++ cp 1
++ jr z,shield_text
++ ld hl,hud_txt_carga
++ ld b,0x06
++ ld de,shield_colors_charge
++shield_text:
++ ld a,b
++ ld (hud_tmp),a
++ push de
++ ld a,6
++ ld (hp_stride),a
++ ld c,25
++shield_text_col:
++ push hl
++ ld b,5
++ ld a,82
++ call hud_put
++ pop hl
++ inc hl
++ inc c
++ ld a,c
++ cp 31
++ jr nz,shield_text_col
++ ld hl,0x5800+10*32+25
++ ld a,(hud_tmp)
++ ld b,6
++shield_text_attr:
++ ld (hl),a
++ inc hl
++ djnz shield_text_attr
++ pop hl
++ ld de,0x5800+9*32+25
++ ld bc,6
++ ldir
++; La sombra privada de atributos sigue siendo copia exacta de la pantalla
++; tambien en el marcador (columnas 24..31), aunque el compositor no lo toque.
++hud_attr_sync:
++ ld hl,0x5800+24
++ ld de,0xf100+24
++ ld a,24
++has_row:
++ ld bc,8
++ ldir
++ ld bc,24
++ add hl,bc
++ ex de,hl
++ add hl,bc
++ ex de,hl
++ dec a
++ jr nz,has_row
++ ret
++shield_colors_ready: db 0x44,0x44,0x44,0x44,0x44,0x44
++shield_colors_active: db 0x45,0x45,0x45,0x45,0x45,0x45
++shield_colors_charge: db 0x42,0x42,0x46,0x46,0x44,0x44
++
++; hud_buf[0..5] = cifras del record: 0, millares, centenas, decenas, unidades, 0.
++record_digits:
++ ld hl,(score_words)
++ push hl
++ ld hl,(record_words)
++ ld (score_words),hl
++ call score_to_digits
++ pop hl
++ ld (score_words),hl
++ ld hl,score_digits
++ ld de,hud_buf+1
++ ld bc,4
++ ldir
++ xor a
++ ld (hud_buf),a
++ ld (hud_buf+5),a
++ ret
++
++; A = linea, C = primera columna: 6 cifras de hud_buf con la fuente de 5x7.
++digits6_draw:
++ ld hl,hud_buf
++ ld b,6
++; A = linea, C = columna, B = numero de cifras, HL = cifras.
++digits_n_draw:
++ ld (hud_tmp),a
++digits6_loop:
++ push bc
++ push hl
++ ld l,(hl)
++ ld h,0
++ ld d,h
++ ld e,l
++ add hl,hl
++ add hl,hl
++ add hl,hl
++ or a
++ sbc hl,de                  ; cifra*7
++ ld de,digit_bitmaps
++ add hl,de
++ ld a,1
++ ld (hp_stride),a
++ ld b,7
++ ld a,(hud_tmp)
++ call hud_put
++ pop hl
++ inc hl
++ pop bc
++ inc c
++ djnz digits6_loop
++ ret
++
++new_record equ 0xf04e
++record_start equ 0xf062
++; hud_buf[0..5] = cifras de los puntos (0, 4 cifras, 0).
++score_digits6:
++ call score_to_digits
++ ld hl,score_digits
++ ld de,hud_buf+1
++ ld bc,4
++ ldir
++ xor a
++ ld (hud_buf),a
++ ld (hud_buf+5),a
++ ret
++
++; VIDAS: tres caras; con la ultima vida la que queda pone cara apurada; las
++; perdidas son un circulo azul punteado.
++lives_hud_present:
++ ld a,(player_lives)
++ ld b,a
++ ld a,(lives_displayed)
++ cp b
++ ret z
++ ld a,b
++ ld (lives_displayed),a
++ xor a
++ ld (face_k),a
++lives_face_loop:
++ ld a,(face_k)
++ ld b,a
++ ld a,(player_lives)
++ ld hl,hud_face_vacia
++ ld c,0x01
++ cp b
++ jr z,lives_face_ready
++ jr c,lives_face_ready
++ ld c,0x46
++ ld hl,hud_face_feliz
++ cp 1
++ jr nz,lives_face_ready
++ ld hl,hud_face_apurado
++lives_face_ready:
++ ld a,c
++ ld (hud_tmp),a
++ ld a,2
++ ld (hp_stride),a
++ ld a,(face_k)
++ add a,a
++ add a,25
++ ld c,a
++ push hl
++ ld b,13
++ ld a,42
++ call hud_put
++ pop hl
++ inc hl
++ inc c
++ ld b,13
++ ld a,42
++ call hud_put
++ ld a,(face_k)
++ add a,a
++ add a,25
++ ld l,a
++ ld h,0
++ ld de,0x5800+5*32
++ add hl,de
++ ld a,(hud_tmp)
++ ld (hl),a
++ inc hl
++ ld (hl),a
++ ld de,31
++ add hl,de
++ ld (hl),a
++ inc hl
++ ld (hl),a
++ ld a,(face_k)
++ inc a
++ ld (face_k),a
++ cp 3
++ jr nz,lives_face_loop
++ jp hud_attr_sync
++
++
++
++; V1.2: genera en $5B00..$5F7F las 8 fases desplazadas de los 3 tiempos de la
++; explosion (16x16 -> 3 bytes x 16 filas). La memoria de $5B00 (buffer de
++; impresora y variables del BASIC) no se usa una vez arrancado el juego.
++explosion_shift_init:
++ ld hl,explosion_src
++ ld de,0x5b00
++ ld c,3
++esi_frame:
++ push bc
++ ld b,16
++esi_phase0:
++ ld a,(hl)
++ ld (de),a
++ inc hl
++ inc de
++ ld a,(hl)
++ ld (de),a
++ inc hl
++ inc de
++ xor a
++ ld (de),a
++ inc de
++ djnz esi_phase0
++ ld c,7
++esi_phase:
++ push hl
++ ld a,e
++ sub 48
++ ld l,a
++ ld a,d
++ jr nc,esi_prev
++ dec a
++esi_prev:
++ ld h,a                     ; HL = fase anterior (DE-48)
++ ld b,16
++esi_row:
++ or a
++ ld a,(hl)
++ rra
++ ld (de),a
++ inc hl
++ inc de
++ ld a,(hl)
++ rra
++ ld (de),a
++ inc hl
++ inc de
++ ld a,(hl)
++ rra
++ ld (de),a
++ inc hl
++ inc de
++ djnz esi_row
++ pop hl
++ dec c
++ jr nz,esi_phase
++ pop bc
++ dec c
++ jr nz,esi_frame
++ ret
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' HALCONES_ESTELARES_CODIGO_FUENTE_1_1/src/v12_sound.asm hal/src/v12_sound.asm
+--- V1_1/src/v12_sound.asm	1970-01-01 01:00:00.000000000 +0100
++++ V1_2/src/v12_sound.asm	2026-11-12 01:46:39.199112557 +0100
+@@ -0,0 +1,313 @@
++; HALCONES ESTELARES 1.2 - SONIDO.
++; El beeper lo mueve la CPU: aqui solo se toca en el tiempo que sobra. Durante
++; la partida, tick_wait toca el efecto en curso mientras espera la interrupcion
++; (el juego no pierde ni un fotograma); en titulo, fase superada y GAME OVER
++; music_frame toca la melodia hasta cada interrupcion.
++; Efecto: db prioridad; segmentos dw semiperiodo, db delta (con signo, por tick),
++; db ticks, db modo (0 tono, 1 ruido, 2 silencio); fin = dw 0.
++snd_ear equ 0xf050
++snd_seg equ 0xf051          ; puntero al siguiente segmento (0 = sin efecto)
++snd_hp equ 0xf053           ; semiperiodo en curso (iteraciones de 26 T)
++snd_delta equ 0xf055
++snd_left equ 0xf056
++snd_mode equ 0xf057
++snd_prio equ 0xf058
++snd_rng equ 0xf059
++mus_ptr equ 0xf05a
++mus_left equ 0xf05c
++mus_note equ 0xf05d
++mus_loop equ 0xf05e
++snd_play_mode equ 0xf060
++
++; HL = efecto. Solo suena si su prioridad es >= la del efecto en curso.
++sfx_start:
++ ld a,(snd_left)
++ or a
++ jr z,sfx_take
++ ld a,(snd_prio)
++ cp (hl)
++ jr z,sfx_take
++ ret nc
++sfx_take:
++ ld a,(hl)
++ ld (snd_prio),a
++ inc hl
++; HL = segmento a cargar.
++sfx_load:
++ ld a,(hl)
++ inc hl
++ ld e,a
++ ld a,(hl)
++ inc hl
++ ld d,a
++ or e
++ jr z,sfx_end
++ ld (snd_hp),de
++ ld a,(hl)
++ inc hl
++ ld (snd_delta),a
++ ld a,(hl)
++ inc hl
++ ld (snd_left),a
++ ld a,(hl)
++ inc hl
++ ld (snd_mode),a
++ ld (snd_seg),hl
++ ret
++sfx_end:
++ xor a
++ ld (snd_left),a
++ ld (snd_prio),a
++ ret
++
++; Una vez por tick de juego: avanza el efecto (barrido y segmentos).
++snd_tick:
++ ld a,(snd_left)
++ or a
++ ret z
++ dec a
++ ld (snd_left),a
++ jr nz,snd_sweep
++ ld hl,(snd_seg)
++ jr sfx_load
++snd_sweep:
++ ld a,(snd_delta)
++ ld e,a
++ ld d,0
++ bit 7,a
++ jr z,snd_sweep_add
++ dec d
++snd_sweep_add:
++ ld hl,(snd_hp)
++ add hl,de
++ ld (snd_hp),hl
++ ret
++
++; Toca el efecto en curso hasta que tick_irqs deje de valer E (o espera).
++snd_slice:
++ ld a,(snd_left)
++ or a
++ jr z,snd_rest
++ ld a,(snd_mode)
++ cp 2
++ jr z,snd_rest
++ ld hl,(snd_hp)
++ ld (snd_play_mode),a
++ jr tone_half
++; A = modo (0 tono, 1 ruido), HL = semiperiodo: suena hasta la siguiente IRQ.
++tone_until_irq:
++ ld (snd_play_mode),a
++ ld a,(tick_irqs)
++ ld e,a
++tone_half:
++ ld a,(snd_play_mode)
++ or a
++ jr z,tone_square
++ ld a,(snd_rng)
++ add a,a
++ jr nc,tone_noise_ok
++ xor 0x1d
++tone_noise_ok:
++ ld (snd_rng),a
++ and 16
++ jr tone_out
++tone_square:
++ ld a,(snd_ear)
++ xor 16
++tone_out:
++ ld (snd_ear),a
++ out (0xfe),a
++ ld b,h
++ ld c,l
++tone_delay:
++ dec bc
++ ld a,b
++ or c
++ jr nz,tone_delay
++ ld a,(tick_irqs)
++ cp e
++ jr z,tone_half
++ ret
++snd_rest:
++ ld a,(tick_irqs)
++ cp e
++ ret nz
++ halt
++ ret
++
++; MUSICA: tune = pares (nota 1..18, fotogramas); nota 0 = silencio; 255 = fin.
++; HL = melodia, DE = punto de vuelta (0 = no se repite).
++music_start:
++ ld (mus_ptr),hl
++ ld (mus_loop),de
++ xor a
++ ld (mus_left),a
++ ret
++music_stop:
++ ld hl,0
++ ld (mus_ptr),hl
++ xor a
++ ld (mus_left),a
++ ret
++; Toca un fotograma de musica (hasta la siguiente IRQ).
++music_frame:
++ ld a,(tick_irqs)
++ ld e,a
++ ld a,(mus_left)
++ or a
++ jr nz,music_play
++ ld hl,(mus_ptr)
++ ld a,h
++ or l
++ jr z,music_rest
++ ld a,(hl)
++ cp 255
++ jr nz,music_note
++ ld hl,(mus_loop)
++ ld a,h
++ or l
++ jr z,music_end
++ ld a,(hl)
++music_note:
++ ld (mus_note),a
++ inc hl
++ ld a,(hl)
++ inc hl
++ ld (mus_left),a
++ ld (mus_ptr),hl
++music_play:
++ ld a,(mus_left)
++ dec a
++ ld (mus_left),a
++ ld a,(mus_note)
++ or a
++ jr z,music_rest
++ add a,a
++ ld l,a
++ ld h,0
++ ld de,note_hp-2
++ add hl,de
++ ld a,(hl)
++ inc hl
++ ld h,(hl)
++ ld l,a
++ xor a
++ jp tone_until_irq
++music_end:
++ call music_stop
++music_rest:
++ ld a,(tick_irqs)
++ ld e,a
++ jr snd_rest
++
++; Llamadas de efecto (sustituyen a los clics de la 1.1).
++sfx_shot:
++ ld hl,fx_shot
++ jp sfx_start
++sfx_enemy_fire:
++ ld hl,fx_enemy_fire
++ jp sfx_start
++sfx_boss_fire:
++ ld hl,fx_boss_fire
++ jp sfx_start
++sfx_explode:
++ ld hl,fx_explode
++ jp sfx_start
++sfx_boss_hit:
++ ld hl,fx_boss_hit
++ ld a,(boss_hp)
++ cp 6
++ jp nc,sfx_start
++ ld hl,fx_boss_hit_low
++ jp sfx_start
++sfx_shield_on:
++ ld hl,fx_shield_on
++ jp sfx_start
++sfx_shield_ready:
++ ld hl,fx_shield_ready
++ jp sfx_start
++sfx_life:
++ ld hl,fx_life
++ jp sfx_start
++sfx_card:
++ ld hl,fx_card
++ jp sfx_start
++sfx_siren:
++ ld hl,fx_siren
++ jp sfx_start
++
++; efectos: prioridad, segmentos (semiperiodo, delta, ticks, modo), fin
++fx_shot: db 1
++ dw 34
++ db 26,5,0
++ dw 0
++fx_enemy_fire: db 1
++ dw 80
++ db 246,3,0
++ dw 0
++fx_boss_fire: db 2
++ dw 230
++ db 20,4,0
++ dw 0
++fx_explode: db 2
++ dw 14
++ db 7,7,1
++ dw 0
++fx_boss_hit: db 2
++ dw 320
++ db 40,3,0
++ dw 0
++fx_boss_hit_low: db 2
++ dw 120
++ db 30,3,0
++ dw 0
++fx_shield_on: db 3
++ dw 420
++ db 216,8,0
++ dw 950
++ db 1,67,0
++ dw 0
++fx_shield_ready: db 2
++ dw 46
++ db 0,2,0
++ dw 1
++ db 0,1,2
++ dw 36
++ db 0,3,0
++ dw 0
++fx_life: db 4
++ dw 125
++ db 0,3,0
++ dw 98
++ db 0,3,0
++ dw 82
++ db 0,3,0
++ dw 60
++ db 0,6,0
++ dw 0
++fx_card: db 1
++ dw 104
++ db 0,2,0
++ dw 1
++ db 0,1,2
++ dw 104
++ db 0,2,0
++ dw 1
++ db 0,1,2
++ dw 68
++ db 0,5,0
++ dw 0
++fx_siren: db 3
++ dw 300
++ db 236,8,0
++ dw 140
++ db 20,8,0
++ dw 300
++ db 236,8,0
++ dw 140
++ db 20,8,0
++ dw 300
++ db 236,8,0
++ dw 140
++ db 20,8,0
++ dw 0
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' HALCONES_ESTELARES_CODIGO_FUENTE_1_1/tests/mini_z80.py hal/tests/mini_z80.py
+--- V1_1/tests/mini_z80.py	2026-11-12 00:05:40.151224500 +0100
++++ V1_2/tests/mini_z80.py	2026-11-12 01:43:53.850555683 +0100
+@@ -18,7 +18,7 @@
+   if extra.exists():self.m[0xf401:0xf401+extra.stat().st_size]=extra.read_bytes()
+   jupiter=(ROOT/'build/jupiter_bitmap_v20.bin')
+   if jupiter.exists():self.m[0xf611:0xf611+jupiter.stat().st_size]=jupiter.read_bytes()
+-  gameover=(ROOT/'build/gameover_rle_v20.bin')
++  gameover=(ROOT/'build/gameover_lz.bin')  # V1.2: GAME OVER comprimido LZ
+   if gameover.exists():self.m[0xf799:0xf799+gameover.stat().st_size]=gameover.read_bytes()
+   self.r=[0]*8 # B,C,D,E,H,L,(HL),A
+   self.sp=0xffff;self.pc=32768;self.f=0;self.ix=0;self.iy=0;self.ir=0;self.im=1;self.steps=0;self.keys=set();self.port_writes=0
+@@ -53,7 +53,7 @@
+   self.sp=(self.sp-1)&65535;self.m[self.sp]=v&255
+  def pop(self):
+   v=self.m[self.sp]|self.m[(self.sp+1)&65535]<<8;self.sp=(self.sp+2)&65535;return v
+- def flags(self,v,carry=0):self.f=(0x40 if (v&255)==0 else 0) | (1 if carry else 0)
++ def flags(self,v,carry=0):self.f=(0x40 if (v&255)==0 else 0) | (1 if carry else 0) | (0x80 if v&0x80 else 0)  # V1.2: tambien signo
+  def cond(self,idx):
+   z=bool(self.f&0x40);c=bool(self.f&1);pv=bool(self.f&4);sg=bool(self.f&0x80)
+   return [not z,z,not c,c,not pv,pv,not sg,sg][idx]  # V1.1: PO/PE/P/M reales
+@@ -160,6 +160,8 @@
+     self.f=(1 if res<0 else 0)|(0x40 if res&65535==0 else 0)|(0x80 if res&0x8000 else 0)|2;return
+    if x==0x5e:self.im=2;return     # IM 2 (real Z80)
+    if x==0x4d:self.pc=self.pop();return # RETI (real Z80)
++   if x in (0x43,0x53,0x63,0x73):  # V1.2: LD (nn),BC/DE/HL/SP
++    addr=self.word();v=self.r16({0x43:0,0x53:1,0x63:2,0x73:3}[x]);self.m[addr]=v&255;self.m[(addr+1)&65535]=v>>8;return
+    if x in (0x4b,0x5b,0x6b,0x7b):
+     addr=self.word();rr={0x4b:0,0x5b:1,0x6b:2,0x7b:3}[x];self.set16(rr,self.m[addr]|(self.m[(addr+1)&65535]<<8));return
+    if x==0xa0:  # LDI; Z80 preserves carry, updates P/V and H/N
+@@ -177,6 +179,8 @@
+    if x==0xb0:
+     n=self.r16(0);src=self.hl();dst=self.r16(1)
+     if dst==src+1 and n:val=self.m[src];self.m[dst:dst+n]=bytes([val])*n
++    elif src<dst<src+n:  # V1.2: solapado hacia delante, byte a byte como el Z80
++     for k in range(n):self.m[(dst+k)&65535]=self.m[(src+k)&65535]
+     else:self.m[dst:dst+n]=self.m[src:src+n]
+     self.sethl(src+n);self.set16(1,dst+n);self.set16(0,0)
+     return
+@@ -193,6 +197,12 @@
+    if x==0x21:setattr(self,prefix,self.word());return
+    if x==0x23:setattr(self,prefix,(idx+1)&65535);return
+    if x==0x19:setattr(self,prefix,(idx+self.r16(1))&65535);return
++   if x in (0x09,0x29,0x39):  # V1.2: ADD IX,BC/IX/SP
++    v={0x09:self.r16(0),0x29:idx,0x39:self.sp}[x];setattr(self,prefix,(idx+v)&65535);return
++   if x==0x2b:setattr(self,prefix,(idx-1)&65535);return
++   if x==0xe9:self.pc=idx;return
++   if x==0x22:a=self.word();self.m[a]=idx&255;self.m[(a+1)&65535]=idx>>8;return
++   if x==0x2a:a=self.word();setattr(self,prefix,self.m[a]|self.m[(a+1)&65535]<<8);return
+    if x in (0xe1,0xe5):
+     if x==0xe1:setattr(self,prefix,self.pop())
+     else:self.push(idx)
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' HALCONES_ESTELARES_CODIGO_FUENTE_1_1/tests/test_101_crow_reagrupacion.py hal/tests/test_101_crow_reagrupacion.py
+--- V1_1/tests/test_101_crow_reagrupacion.py	2026-11-12 00:05:40.151495947 +0100
++++ V1_2/tests/test_101_crow_reagrupacion.py	2026-11-12 01:32:06.508958064 +0100
+@@ -35,11 +35,15 @@
+     try:
+         for f in range(maxf):
+             pc=z.pc
+-            s.frame({'SPACE'} if (S['title_wait_press']<=pc<=S['title_wait_press']+11 and started is None) else ())
+-            if started is None and not (S['title_screen_wait']<=z.pc<=S['title_wait_press']+24) and s.frames>60:started=s.frames
++            # V1.2: el titulo toca musica mientras espera: se pulsa SPACE un momento
++            # y la partida se da por empezada al aparecer el cartel OLEADA 1.
++            s.frame({'SPACE'} if (60<=s.frames<66 and started is None) else ())
++            if started is None and z.m[S['card_ticks']]:started=s.frames
+             assert z.pc>=0x4000,('RESET: pc en ROM',hex(z.pc),fl,guard)
+             assert not any(e[1]=='BLOQUEO' for e in s.events),('BLOQUEO',fl,guard)
+-            if started and S['gameover_wait_press']<=z.pc<=S['gameover_wait_press']+9:
++            # V1.2: las esperas del GAME OVER tocan musica (ya no son HALT); se
++            # detecta la pantalla por su temporizador de 3 s ya armado.
++            if started and z.m[S['gameover_mode']]==1:
+                 assert bad[0]==0,('sprite con Y>=192',bad[0],fl,guard)
+                 return s.frames
+         raise AssertionError(('sin GAME OVER',fl,guard))
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' HALCONES_ESTELARES_CODIGO_FUENTE_1_1/tests/test_v12_remozado.py hal/tests/test_v12_remozado.py
+--- V1_1/tests/test_v12_remozado.py	1970-01-01 01:00:00.000000000 +0100
++++ V1_2/tests/test_v12_remozado.py	2026-11-12 01:56:20.496212491 +0100
+@@ -0,0 +1,177 @@
++#!/usr/bin/env python3
++"""HALCONES ESTELARES 1.2 - remozado grafico y sonido (emulador Z80 completo).
++1. El titulo descomprimido (LZ) es exactamente build/TITULO_V12.scr (bitmap).
++2. Marcador: caras feliz/apurada/vacia segun las vidas; escudo LISTO/CARGANDO.
++3. LEDs del marco: MOAI = los tres fijos; enemigo cerca = parpadeo; escudo
++   listo = barrido verde.
++4. MOAI: grietas al bajar a 12/6/3 de vida, boca que se abre y se cierra
++   (el cielo queda intacto), luna que cruza por delante de Jupiter, derrumbe
++   por bloques que deja limpio el cielo y lleva a la pantalla de fase.
++5. Sonido: el beeper suena en las esperas sin romper los 25 ticks/s.
++6. El record se conserva entre partidas y GAME OVER lo anuncia."""
++import sys,json
++from pathlib import Path
++R=Path(__file__).resolve().parents[1]
++sys.path.insert(0,str(R/'tests'/'emulador_completo'))
++import harness
++from harness import Speccy
++TAP=str(R/'build'/'HALCONES_ESTELARES_V281.tap')
++S=json.load(open(R/'build'/'starter.sym.json'))
++ROWS=[((y&0xc0)<<5)|((y&7)<<8)|((y&0x38)<<2) for y in range(192)]
++
++def in_game(kemp=0xff):
++    s=Speccy(tap=TAP,watch=False);s.kempston=kemp;m=s.z.m
++    for f in range(400):
++        s.frame({'SPACE'} if 90<=f<96 else ())
++        if f>100 and m[S['card_ticks']]:break
++    assert m[S['card_ticks']],'no empezo la partida'
++    return s
++
++def test_titulo():
++    s=Speccy(tap=TAP,watch=False);m=s.z.m
++    for f in range(60):s.frame(())
++    ref=(R/'build'/'TITULO_V12.scr').read_bytes()
++    rec=set(ROWS[y]+c for y in range(152,160) for c in range(32))   # cifras del RECORD (las pone el juego)
++    bad=[i for i in range(6144) if m[0x4000+i]!=ref[i] and i not in rec]
++    assert not bad,('el titulo no coincide con TITULO_V12.scr',bad[:8])
++    s.screen(str(R/'build'/'V12_TITULO.png'))
++
++def test_marcador():
++    s=in_game();m=s.z.m
++    for f in range(60):s.frame(())
++    def face(i):
++        return bytes(m[0x4000+ROWS[y]+25+2*i+k] for y in range(42,55) for k in (0,1))
++    feliz,apurado,vacia=(bytes(m[S[n]:S[n]+26]) for n in ('hud_face_feliz','hud_face_apurado','hud_face_vacia'))
++    assert [face(i) for i in range(3)]==[feliz]*3
++    for lives,exp in ((2,[feliz,feliz,vacia]),(1,[apurado,vacia,vacia])):
++        m[S['player_lives']]=lives
++        for f in range(4):s.frame(())
++        assert [face(i) for i in range(3)]==exp,('caras',lives)
++        assert m[0x5800+5*32+25]==0x46 and m[0x5800+5*32+29]==0x01
++    s.screen(str(R/'build'/'V12_MARCADOR.png'))
++    # escudo: LISTO parpadea en verde; al usarlo pasa a ACTIVO y luego CARGANDO
++    assert m[0x5800+10*32+25]==0xc4
++    for f in range(4):s.frame({'A'})
++    assert m[S['shield_state']]==1 and m[0x5800+10*32+25]==0x45
++    for f in range(160):s.frame(())
++    assert m[S['shield_state']]==2 and m[0x5800+10*32+25]==0x06
++    assert [m[0x5800+9*32+25+c] for c in range(6)]==[0x42,0x42,0x46,0x46,0x44,0x44]
++
++def leds(m):return (m[0x58c0],m[0x5980],m[0x5a40])
++
++def test_leds():
++    s=in_game();m=s.z.m
++    for f in range(80):s.frame(())
++    seen=set()
++    for f in range(40):
++        s.frame(());seen.add(leds(m))
++    assert all(set(l)<={0x44,0x04} for l in seen) and any(0x44 in l for l in seen),('barrido verde',seen)
++    e=S['enemy_slots'];m[e+1]=130;m[e+2]=2
++    seen=set()
++    for f in range(8):
++        m[e+1]=130;m[e+2]=2;s.frame(());seen.add(leds(m))
++    assert (0x42,0x42,0x42) in seen and (0x02,0x02,0x02) in seen,('parpadeo de peligro',seen)
++
++def to_boss(s):
++    m=s.z.m
++    for i in range(6):m[S['enemy_slots']+6*i+2]=0
++    m[S['wave_stage']]=2;m[S['wave_repeat']]=1;m[S['wave_done']]=1;m[S['card_ticks']]=0
++    for f in range(20):
++        s.frame(())
++        if m[S['wave_stage']]==3:break
++    assert m[S['wave_stage']]==3 and m[S['boss_hp']]==18
++
++def moai_sky(m):
++    return bytes(m[0xd800+ROWS[y]+9+c] for y in range(8,96) for c in range(6))
++
++def test_moai():
++    s=in_game();m=s.z.m
++    for f in range(60):s.frame(())
++    m[S['shield_invulnerable']]=0
++    to_boss(s)
++    m[S['player_take_hit']]=0xc9 if False else m[S['player_take_hit']]
++    sky0=moai_sky(m)
++    # boca: al disparar se abre en pantalla y trabajo, el cielo no cambia
++    m[S['enemy_fire_cd']]=0
++    for f in range(4):
++        s.frame(())
++        if m[S['mouth_ticks']]:break
++    assert m[S['mouth_ticks']],'el MOAI no abrio la boca'
++    s.frame(());s.frame(())
++    a=ROWS[66]+11
++    assert m[0x4000+a]==0 and m[0xc000+a]==0 and m[0xd800+a]!=0
++    assert m[0x586a]==0x42,'ojos encendidos al disparar'
++    for f in range(30):s.frame(())
++    assert m[S['mouth_ticks']]==0 and m[0x4000+a]==m[0xd800+a],'boca cerrada'
++    # grietas al bajar a 12, 6 y 3
++    lit=[]
++    for hp in (13,7,4):
++        m[S['boss_hp']]=hp
++        b=S['bullet_slots'];m[b:b+3]=bytes([96,60,1])
++        for f in range(4):s.frame(())
++        lit.append(sum(bin(x).count('1') for x in moai_sky(m)))
++    base=sum(bin(x).count('1') for x in sky0)
++    assert base>lit[0]>lit[1]>lit[2],('grietas',base,lit)
++    s.screen(str(R/'build'/'V12_MOAI_GRIETAS.png'))
++    # luna: avanza y se dibuja entre y=113 y 119
++    x0=m[S['moon_x']]
++    for f in range(60):s.frame(())
++    assert m[S['moon_x']]>x0 and m[S['moon_x']]>=24
++    # derrumbe por bloques: el cielo del MOAI queda vacio y llega la pantalla de fase
++    m[S['boss_hp']]=1;b=S['bullet_slots'];m[b:b+3]=bytes([96,60,1])
++    partial=False
++    for f in range(400):
++        s.frame(())
++        bl=m[S['boss_blocks']]
++        if 0<bl<60 and not partial:
++            partial=True;n=sum(1 for x in moai_sky(m) if x)
++            assert 0<n<len(sky0),'derrumbe a medias'
++            s.screen(str(R/'build'/'V12_MOAI_DERRUMBE.png'))
++        if m[S['gameover_mode']]==2:break
++    assert partial and m[S['gameover_mode']]==2,'no llego la pantalla de fase'
++    assert not any(moai_sky(m)),'restos del MOAI en el cielo'
++    s.screen(str(R/'build'/'V12_FASE.png'))
++
++def test_sonido_y_ritmo():
++    s=in_game();z=s.z;m=z.m
++    for f in range(50):s.frame(())
++    outs=[0];op=s.port_out
++    def po(port,v):
++        if port&1==0:outs[0]+=1
++        op(port,v)
++    z.port_out=po
++    ticks=[];t=S['combat_tick']
++    for f in range(200):
++        keys={'SPACE'} if f%8<4 else set()
++        s.keys=keys;end=z.t+harness.FRAME
++        while z.t<end:
++            if z.pc==t:ticks.append(s.frames)
++            z.step()
++        s.frames+=1
++        if z.iff1 and not z.ei_delay:
++            pc0,sp0=((z.pc+1)&0xffff if z.halted else z.pc),z.sp
++            if z.interrupt():
++                while not(z.pc==pc0 and z.sp==sp0):z.step()
++    gaps=[b-a for a,b in zip(ticks,ticks[1:])]
++    assert outs[0]>1000,('el beeper casi no suena',outs[0])
++    assert min(gaps)>=2 and gaps.count(2)>=len(gaps)*0.95,('ritmo',sorted(set(gaps)))
++
++def test_record():
++    s=in_game();m=s.z.m
++    m[S['score_words']]=123;m[S['score_words']+1]=0
++    for f in range(4):s.frame(())
++    m[S['player_take_hit']]=0xc9
++    m[S['player_lives']]=0;m[S['shield_invulnerable']]=60
++    for f in range(300):
++        s.frame(())
++        if m[S['gameover_mode']]==1:break
++    assert m[S['gameover_mode']]==1
++    for f in range(20):s.frame(())
++    assert m[0x5800+17*32+12]&7!=(m[0x5800+17*32+12]>>3)&7,'NUEVO RECORD visible'
++    s.screen(str(R/'build'/'V12_GAMEOVER_RECORD.png'))
++    assert m[S['record_words']]|m[S['record_words']+1]<<8==123
++
++if __name__=='__main__':
++    for t in (test_titulo,test_marcador,test_leds,test_moai,test_sonido_y_ritmo,test_record):
++        t();print('PASS',t.__name__,flush=True)
++    print('PASS V1.2 remozado: titulo, marcador, LEDs, MOAI (grietas, boca, luna, derrumbe), sonido a 25 ticks/s, record')
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' HALCONES_ESTELARES_CODIGO_FUENTE_1_1/tests/test_v26_regroup_led_moai.py hal/tests/test_v26_regroup_led_moai.py
+--- V1_1/tests/test_v26_regroup_led_moai.py	2026-11-12 00:05:40.151260192 +0100
++++ V1_2/tests/test_v26_regroup_led_moai.py	2026-11-12 01:58:48.293718572 +0100
+@@ -89,9 +89,11 @@
+             assert v.m[addr]==0x43,(hex(addr),hex(v.m[addr]))
+             assert v.m[addr+0x9900]==0x43,(hex(addr),hex(v.m[addr+0x9900]))
+ assert v.m[0x586a] in (0x42,0x40) and v.m[0x586d] in (0x42,0x40)
+-v.set('frame_index',0);tick(v)
++# V1.2: los ojos se encienden justo antes de disparar (temporizador < 10) y se
++# apagan el resto del tiempo (antes alternaban por frame_index).
++v.set('enemy_fire_cd',6);tick(v)
+ assert v.m[0x586a]==0x42 and v.m[0x586d]==0x42
+-v.set('frame_index',20);tick(v)
++v.set('enemy_fire_cd',40);v.set('mouth_ticks',0);tick(v)
+ assert v.m[0x586a]==0x40 and v.m[0x586d]==0x40
+ v.render(R/'build/V26_MOAI_MAGENTA_Z80.png',scale=3)
+ print('PASS magenta MOAI face + independent red/black eye pulses, shadow synchronized')
+@@ -99,8 +101,9 @@
+ # Independent LED sequence in real native Spectrum attrs, while bitmap stays fixed.
+ v=boot_to_game(VM())
+ lamps=(0x58c0,0x5980,0x5a40)
+-assert [v.m[x] for x in lamps]==[0x42,0x02,0x02]  # Upper LED initially bright; other lamps dim.
+-for n,expected in [(8,[0x02,0x42,0x02]),(8,[0x02,0x02,0x42]),(8,[0x02,0x42,0x02]),(8,[0x42,0x02,0x02])]:
++# V1.2: con el escudo listo el barrido es verde (0x44 encendido, 0x04 apagado).
++assert [v.m[x] for x in lamps]==[0x44,0x04,0x04]  # Upper LED initially bright; other lamps dim.
++for n,expected in [(8,[0x04,0x44,0x04]),(8,[0x04,0x04,0x44]),(8,[0x04,0x44,0x04]),(8,[0x44,0x04,0x04])]:
+     for _ in range(n):tick(v)
+     assert [v.m[x] for x in lamps]==expected,([hex(v.m[x]) for x in lamps],expected)
+     assert [v.m[x+0x9900] for x in lamps]==expected
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' HALCONES_ESTELARES_CODIGO_FUENTE_1_1/tests/test_v27_led_jupiter.py hal/tests/test_v27_led_jupiter.py
+--- V1_1/tests/test_v27_led_jupiter.py	2026-11-12 00:05:40.151278256 +0100
++++ V1_2/tests/test_v27_led_jupiter.py	2026-11-12 01:58:48.294326730 +0100
+@@ -63,14 +63,14 @@
+     assert actual==expect,('Jupiter placed incorrectly',y,actual,expect)
+ print('PASS Jupiter 56x56 relocated exactly to (128,96), colour and immutable bitmap agree')
+ 
+-v.set('frame_index',0);tick(v)
++v.set('enemy_fire_cd',6);tick(v)   # V1.2: ojos encendidos antes del disparo
+ assert (v.m[0x586a],v.m[0x586d])==(0x42,0x42)
+ assert (v.m[0xf16a],v.m[0xf16d])==(0x42,0x42)
+ check_bitmap(v)
+ v.render(R/'build/V27_MOAI_LED_JUPITER_BAJO_Z80.png',scale=3)
+ # Normal magenta cell adjacent to eye stays unmodified.
+ assert v.m[0x586b]==0x43 and v.m[0x586c]==0x43
+-v.set('frame_index',20);tick(v)
++v.set('enemy_fire_cd',40);v.set('mouth_ticks',0);tick(v)   # V1.2: apagados
+ assert (v.m[0x586a],v.m[0x586d])==(0x40,0x40)
+ assert (v.m[0xf16a],v.m[0xf16d])==(0x40,0x40)
+ check_bitmap(v)
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' HALCONES_ESTELARES_CODIGO_FUENTE_1_1/tests/test_v281_logo_bird_pulse.py hal/tests/test_v281_logo_bird_pulse.py
+--- V1_1/tests/test_v281_logo_bird_pulse.py	2026-11-12 00:05:40.151288232 +0100
++++ V1_2/tests/test_v281_logo_bird_pulse.py	1970-01-01 01:00:00.000000000 +0100
+@@ -1,81 +0,0 @@
+-#!/usr/bin/env python3
+-"""Regression: assembled ZX title, original yellow letterforms, integrated beak, ARC pulse."""
+-from pathlib import Path
+-from mini_z80 import VM,SYM
+-import hashlib,functools
+-R=Path(__file__).resolve().parents[1]
+-ref=(R/'assets/TITULO_01_IMPERIAL_SIN_PICO.scr').read_bytes()
+-v27=(R/'assets/TITULO_V27_ORIGINAL_INTACTO.scr').read_bytes()
+-new=(R/'assets/HALCONES_ESTELARES_TITLE.scr').read_bytes()
+-assert len(ref)==len(new)==6912
+-assert ref[:6144]!=new[:6144]
+-assert new[6144:6144+10*32]==v27[6144:6144+10*32], 'Original V2.7 title ATTRIBUTES must be byte-exact!'
+-assert new[6144+10*32:6144+13*32]==ref[6144+10*32:6144+13*32]
+-assert ref[6144+14*32:]==new[6144+14*32:]
+-# EXACT V2.7 title text + subtitle and rest unchanged; character bitmap & attrs through y=103.
+-for y in list(range(0,104))+list(range(112,192)):
+-    a=((y&0xC0)<<5)+((y&7)<<8)+((y&0x38)<<2)
+-    assert new[a:a+32]==(v27 if y<80 else ref)[a:a+32], ('Non-beak bitmap changed',y)
+-for y in range(104,112):
+-    a=((y&0xC0)<<5)+((y&7)<<8)+((y&0x38)<<2)
+-    for xbyte in range(32):
+-        if xbyte not in (15,16):
+-            assert new[a+xbyte]==ref[a+xbyte],('Outside beak cell modified',y,xbyte)
+-for j,(a,b) in enumerate(zip(new[6144:],ref[6144:])):
+-    assert a==(v27[6144+j] if j < 10*32 else b) or j in ((13*32+15),(13*32+16)),('Non-beak color modified',j)
+-print('PASS V2.7 original title 80 scanlines and attributes BYTE-EXACT; complete IMPERIAL bird below')
+-# Assemble executable, boot through title and test live animation exactly every 50Hz HALT.
+-v=VM()
+-v.run_to(lambda q:q.pc==SYM['title_wait_release'],steps=1_000_000)
+-assert bytes(v.m[0x4000:0x5b00])==new
+-v.keys=set()
+-v.run_to(lambda q:q.pc==SYM['title_wait_press'],steps=10000)
+-origbm=bytes(v.m[0x4000:0x5800]); origatr=bytes(v.m[0x5800:0x5b00]); source_attr=bytes(v.m[0x7d40:0x7e20])
+-assert source_attr==new[6144+32:6144+8*32]
+-yellow_cells=sum((x&7)==6 for x in origatr[32:256]);assert yellow_cells>100
+-
+-def frames(num):
+-    for i in range(num):
+-        assert v.pc==SYM['title_wait_press'],(i,hex(v.pc))
+-        v.step()
+-        v.run_to(lambda q:q.pc==SYM['title_wait_press'],steps=15000)
+-
+-def check_phase(p):
+-    a=bytes(v.m[0x5800:0x5b00]);
+-    assert bytes(v.m[0x4000:0x5800])==origbm,'Original font or hawk bitmap changed by pulse!'
+-    assert a[:32]==origatr[:32] and a[256:]==origatr[256:],'Subtitle or other text was recolored!'
+-    for col,(got,orig) in enumerate(zip(a[32:256],origatr[32:256])):
+-        expected=0x47 if (p&1 and orig&7==6) else orig
+-        assert got==expected,(p,col,hex(got),hex(expected))
+-    assert v.m[SYM['title_pulse_phase']]==p
+-
+-check_phase(0)
+-for duration,phase in ((75,1),(6,2),(9,3),(3,0),(75,1)):
+-    frames(duration);check_phase(phase)
+-print('PASS native Z80 double arcade pulse: 75/yellow -> 6/white -> 9/yellow -> 3/white -> 75/yellow')
+-# Test boot and legacy beeper precisely, no input system change.
+-v.keys={'SPACE'}
+-v.run_to(lambda q:q.pc==SYM['title_wait_start_release'],steps=10000)
+-v.keys=set()
+-v.run_to(lambda q:q.pc==SYM['main_loop'],steps=900000)
+-assert v.sp==0xfff0 and v.im==2
+-oldwrites=v.port_writes;sp=v.sp;ret=v.pc
+-v.push(ret);v.pc=SYM['beep_enemy_destroy']
+-v.run_to(lambda q:q.pc==ret and q.sp==sp,steps=10000)
+-assert v.port_writes-oldwrites==14
+-# frame relocated immutable check
+-import json
+-frame=json.loads((R/'build/frame_manifest_v17.json').read_text())
+-assert v.m[0x7bc0:0x7d40]==bytes(frame['bitmap'])
+-print('PASS gameplay starts; brief 14 OUT blip retained; frame resource exact; IM2/SP intact')
+-# Binary reproducibility + valid TAP blocks
+-n=(R/'build/HALCONES_ESTELARES_V281.tap').read_bytes()
+-p=0;blocks=[]
+-while p<len(n):
+-    l=int.from_bytes(n[p:p+2],'little');p+=2
+-    block=n[p:p+l];p+=l
+-    assert len(block)==l and functools.reduce(int.__xor__,block,0)==0
+-    blocks.append(block)
+-assert len(blocks)==8 and p==len(n)
+-assert blocks[3][1:-1]==(R/'build/starter.bin').read_bytes()
+-print('PASS V281 TAP integrity and main Z80 segment identical to assembled code')
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' HALCONES_ESTELARES_CODIGO_FUENTE_1_1/tools/generate_jupiter_v20.py hal/tools/generate_jupiter_v20.py
+--- V1_1/tools/generate_jupiter_v20.py	2026-11-12 00:05:40.151661845 +0100
++++ V1_2/tools/generate_jupiter_v20.py	2026-11-12 01:51:44.064486855 +0100
+@@ -30,6 +30,24 @@
+         v=occupancy.getpixel((x,y))
+         on=v>54 and (((x+y)&1)==0 or v>150)
+         out.putpixel((x,y),1 if on else 0)
++# V1.2: luz y sombra para que se lea como una esfera. Luz desde arriba a la
++# izquierda: lado iluminado con las bandas mas llenas y borde nitido; lado de
++# noche con el tramado cada vez mas abierto. Las bandas originales se conservan.
++import math
++LX,LY,LZ=-0.62,-0.55,0.56
++lit=Image.new('1',(W,H))
++for y in range(H):
++    for x in range(W):
++        nx=(x-27.5)/28.0;ny=(y-27.5)/28.0;rr=nx*nx+ny*ny
++        on=out.getpixel((x,y))
++        if rr>1.0:lit.putpixel((x,y),0);continue
++        nz=math.sqrt(1-rr);sh=nx*LX+ny*LY+nz*LZ
++        if sh>0.80 and (x+2*y)%4==0:on=1                  # brillo suave arriba a la izquierda
++        if sh<0.05 and on and (x*3+y*5)%4!=0:on=0         # penumbra: se abre el tramado
++        if sh<-0.30 and on and (x+y*3)%3!=0:on=0         # noche: casi vacio
++        if 0.93<rr<=1.0 and sh>-0.15:on=1                # borde nitido por el lado iluminado
++        lit.putpixel((x,y),on)
++out=lit
+ bits=bytes(sum((0x80>>bit) for bit in range(8) if out.getpixel((bx*8+bit,y)))
+            for y in range(H) for bx in range(W//8))
+ assert len(bits)==392
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' HALCONES_ESTELARES_CODIGO_FUENTE_1_1/tools/lz.py hal/tools/lz.py
+--- V1_1/tools/lz.py	1970-01-01 01:00:00.000000000 +0100
++++ V1_2/tools/lz.py	2026-11-12 01:25:35.077133891 +0100
+@@ -0,0 +1,41 @@
++"""Compresor LZ sencillo para el Z80 (descompresor lz_unpack en title_screen.asm).
++Formato: byte de control C
++  C=0          -> fin
++  C=1..127     -> C literales a continuacion
++  C=128..191   -> copia de C-125 bytes desde destino-D, D en 1 byte (1..255)
++  C=192..255   -> copia de C-189 bytes desde destino-D, D en 2 bytes"""
++from collections import defaultdict
++def compress(data):
++    out=bytearray();i=0;lit=bytearray();n=len(data);idx=defaultdict(list)
++    def flush():
++        nonlocal lit
++        while lit:
++            ch=lit[:127];out.append(len(ch));out.extend(ch);lit=lit[127:]
++    while i<n:
++        best=(0,0)
++        if i+3<=n:
++            for p in reversed(idx[bytes(data[i:i+3])][-200:]):
++                l=0
++                while i+l<n and l<66 and data[p+l]==data[i+l]:l+=1
++                d=i-p;cost=2 if d<256 else 3
++                if best[0]==0 or l-cost>best[0]-(2 if best[1]<256 else 3):best=(l,d)
++        if best[0]>=3 and not (best[1]>=256 and best[0]<4):
++            flush();l,d=best
++            if d<256:out.append(128+l-3);out.append(d)
++            else:out.append(192+l-3);out.append(d&255);out.append(d>>8)
++            for k in range(i,i+l):
++                if k+3<=n:idx[bytes(data[k:k+3])].append(k)
++            i+=l
++        else:
++            if i+3<=n:idx[bytes(data[i:i+3])].append(i)
++            lit.append(data[i]);i+=1
++    flush();out.append(0);return bytes(out)
++def decompress(c):
++    out=bytearray();i=0
++    while True:
++        k=c[i];i+=1
++        if k==0:return bytes(out)
++        if k<128:out+=c[i:i+k];i+=k;continue
++        if k<192:l=k-125;d=c[i];i+=1
++        else:l=k-189;d=c[i]|c[i+1]<<8;i+=2
++        for _ in range(l):out.append(out[-d])
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' HALCONES_ESTELARES_CODIGO_FUENTE_1_1/tools/v12_font.py hal/tools/v12_font.py
+--- V1_1/tools/v12_font.py	1970-01-01 01:00:00.000000000 +0100
++++ V1_2/tools/v12_font.py	2026-11-12 01:16:08.575945531 +0100
+@@ -0,0 +1,103 @@
++# Fuente 5x7 (en celda de 8) y cifras gruesas 7x8 para el marcador.
++F5={
++'A':[".###.","#...#","#...#","#####","#...#","#...#","#...#"],
++'B':["####.","#...#","#...#","####.","#...#","#...#","####."],
++'C':[".###.","#...#","#....","#....","#....","#...#",".###."],
++'D':["####.","#...#","#...#","#...#","#...#","#...#","####."],
++'E':["#####","#....","#....","####.","#....","#....","#####"],
++'F':["#####","#....","#....","####.","#....","#....","#...."],
++'G':[".###.","#...#","#....","#.###","#...#","#...#",".####"],
++'H':["#...#","#...#","#...#","#####","#...#","#...#","#...#"],
++'I':[".###.","..#..","..#..","..#..","..#..","..#..",".###."],
++'J':["..###","...#.","...#.","...#.","#..#.","#..#.",".##.."],
++'K':["#...#","#..#.","#.#..","##...","#.#..","#..#.","#...#"],
++'L':["#....","#....","#....","#....","#....","#....","#####"],
++'M':["#...#","##.##","#.#.#","#.#.#","#...#","#...#","#...#"],
++'N':["#...#","##..#","#.#.#","#..##","#...#","#...#","#...#"],
++'O':[".###.","#...#","#...#","#...#","#...#","#...#",".###."],
++'P':["####.","#...#","#...#","####.","#....","#....","#...."],
++'Q':[".###.","#...#","#...#","#...#","#.#.#","#..#.",".##.#"],
++'R':["####.","#...#","#...#","####.","#.#..","#..#.","#...#"],
++'S':[".####","#....","#....",".###.","....#","....#","####."],
++'T':["#####","..#..","..#..","..#..","..#..","..#..","..#.."],
++'U':["#...#","#...#","#...#","#...#","#...#","#...#",".###."],
++'V':["#...#","#...#","#...#","#...#","#...#",".#.#.","..#.."],
++'W':["#...#","#...#","#...#","#.#.#","#.#.#","##.##","#...#"],
++'X':["#...#","#...#",".#.#.","..#..",".#.#.","#...#","#...#"],
++'Y':["#...#","#...#",".#.#.","..#..","..#..","..#..","..#.."],
++'Z':["#####","....#","...#.","..#..",".#...","#....","#####"],
++'0':[".###.","#...#","#..##","#.#.#","##..#","#...#",".###."],
++'1':["..#..",".##..","..#..","..#..","..#..","..#..",".###."],
++'2':[".###.","#...#","....#","...#.","..#..",".#...","#####"],
++'3':["####.","....#","....#",".###.","....#","....#","####."],
++'4':["...#.","..##.",".#.#.","#..#.","#####","...#.","...#."],
++'5':["#####","#....","####.","....#","....#","#...#",".###."],
++'6':[".###.","#....","#....","####.","#...#","#...#",".###."],
++'7':["#####","....#","...#.","..#..",".#...",".#...",".#..."],
++'8':[".###.","#...#","#...#",".###.","#...#","#...#",".###."],
++'9':[".###.","#...#","#...#",".####","....#","....#",".###."],
++' ':["....."]*7,
++'.':[".....",".....",".....",".....",".....",".##..",".##.."],
++':':[".....",".##..",".##..",".....",".##..",".##..","....."],
++'-':[".....",".....",".....",".###.",".....",".....","....."],
++'/':["....#","...#.","...#.","..#..",".#...",".#...","#...."],
++'!':["..#..","..#..","..#..","..#..","..#..",".....","..#.."],
++'¡':["..#..",".....","..#..","..#..","..#..","..#..","..#.."],
++'©':[".###.","#...#","#.#.#","##..#","#.#.#","#...#",".###."],
++'x':[".....",".....","#...#",".#.#.","..#..",".#.#.","#...#"],
++'+':[".....","..#..","..#..","#####","..#..","..#..","....."],
++'=':[".....",".....","#####",".....","#####",".....","....."],
++}
++# Cifras gruesas 7x8 (trazo doble) para PUNTOS
++BIG={
++'0':[".#####.","##...##","##..###","##.#.##","###..##","##...##",".#####.","......."],
++'1':["...##..","..###..",".####..","...##..","...##..","...##..",".######","......."],
++'2':[".#####.","##...##",".....##","...###.",".###...","##.....","#######","......."],
++'3':["######.",".....##",".....##","..####.",".....##",".....##","######.","......."],
++'4':["....##.","...###.","..####.",".##.##.","#######","....##.","....##.","......."],
++'5':["#######","##.....","######.",".....##",".....##","##...##",".#####.","......."],
++'6':[".#####.","##.....","##.....","######.","##...##","##...##",".#####.","......."],
++'7':["#######",".....##","....##.","...##..","..##...","..##...","..##...","......."],
++'8':[".#####.","##...##","##...##",".#####.","##...##","##...##",".#####.","......."],
++'9':[".#####.","##...##","##...##",".######",".....##",".....##",".#####.","......."],
++}
++def text(zx,x,y,s,font=F5,adv=6):
++    for ch in s:
++        g=font.get(ch,font.get(ch.upper()))
++        if g:zx.blit(x,y,g)
++        x+=adv
++    return x
++def width(s,adv=6):return len(s)*adv-1
++def ctext(zx,cx,y,s,adv=6):return text(zx,cx-width(s,adv)//2,y,s,adv=adv)
++# Versalitas 5x5 para las bandas de cabecera
++S5={
++'A':[".###.","#...#","#####","#...#","#...#"],'C':[".####","#....","#....","#....",".####"],
++'D':["####.","#...#","#...#","#...#","####."],'E':["#####","#....","####.","#....","#####"],
++'F':["#####","#....","####.","#....","#...."],'I':["###","..#..".strip('.') and ".#.",".#.",".#.","###"],
++'L':["#....","#....","#....","#....","#####"],'N':["#...#","##..#","#.#.#","#..##","#...#"],
++'O':[".###.","#...#","#...#","#...#",".###."],'P':["####.","#...#","####.","#....","#...."],
++'R':["####.","#...#","####.","#..#.","#...#"],'S':[".####","#....",".###.","....#","####."],
++'T':["#####","..#..","..#..","..#..","..#.."],'U':["#...#","#...#","#...#","#...#",".###."],
++'V':["#...#","#...#","#...#",".#.#.","..#.."],'M':["#...#","##.##","#.#.#","#...#","#...#"],
++'X':["#...#",".#.#.","..#..",".#.#.","#...#"],'G':[".####","#....","#.###","#...#",".###."],
++'H':["#...#","#...#","#####","#...#","#...#"],'K':["#..#.","#.#..","##...","#.#..","#..#."],
++'0':[".###.","#..##","#.#.#","##..#",".###."],'1':[".#.","##.",".#.",".#.","###"],
++'2':["####.","....#",".###.","#....","#####"],'3':["####.","....#",".###.","....#","####."],
++'4':["#..#.","#..#.","#####","...#.","...#."],'5':["#####","#....","####.","....#","####."],
++'6':[".###.","#....","####.","#...#",".###."],'7':["#####","....#","...#.","..#..","..#.."],
++'8':[".###.","#...#",".###.","#...#",".###."],'9':[".###.","#...#",".####","....#",".###."],
++' ':["..."]*5,'/':["....#","...#.","..#..",".#...","#...."],'-':["....","....","####","....","...."],
++'B':["####.","#...#","####.","#...#","####."],'Y':["#...#",".#.#.","..#..","..#..","..#.."],
++'!':["#","#","#",".","#"],'Q':[".###.","#...#","#.#.#","#..#.",".##.#"],'Z':["#####","...#.","..#..",".#...","#####"],
++}
++S5['I']=["###",".#.",".#.",".#.","###"]
++def stext(zx,x,y,s):
++    for ch in s:
++        g=S5[ch];zx.blit(x,y,g);x+=len(g[0])+1
++    return x
++def swidth(s):return sum(len(S5[c][0])+1 for c in s)-1
++def sctext(zx,cx,y,s):return stext(zx,cx-swidth(s)//2,y,s)
++
++T3={'0':["###","#.#","#.#","#.#","###"],'1':[".#.","##.",".#.",".#.","###"],'2':["##.","..#",".#.","#..","###"],
++'3':["##.","..#",".#.","..#","##."],'4':["#.#","#.#","###","..#","..#"],'5':["###","#..","##.","..#","##."],
++'6':[".##","#..","###","#.#","###"],'7':["###","..#",".#.",".#.",".#."],'8':["###","#.#","###","#.#","###"],'9':["###","#.#","###","..#","##."]}
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' HALCONES_ESTELARES_CODIGO_FUENTE_1_1/tools/v12_graficos.py hal/tools/v12_graficos.py
+--- V1_1/tools/v12_graficos.py	1970-01-01 01:00:00.000000000 +0100
++++ V1_2/tools/v12_graficos.py	2026-11-12 01:28:54.129110625 +0100
+@@ -0,0 +1,72 @@
++"""HALCONES ESTELARES 1.2 - generador de datos graficos y de sonido.
++Se ejecuta desde build.py despues de los generadores historicos. Produce:
++  build/v12_data.asm      datos del bloque principal (pantallas LZ, HUD LZ, fuentes...)
++  build/gameover_lz.bin   pantalla de GAME OVER comprimida (bloque de extras)
++  build/assets_v12.asm    assets.asm sin el HUD antiguo sin comprimir
++"""
++from pathlib import Path
++import re
++from tools.lz import compress,decompress
++R=Path(__file__).resolve().parents[1]
++B=R/'build'
++def rle_decode(b):
++    out=bytearray();i=0
++    while len(out)<6912:
++        if b[i]==255:out+=bytes([b[i+2]])*b[i+1];i+=3
++        else:out.append(b[i]);i+=1
++    return bytes(out[:6912])
++def db_lines(label,data):
++    rows=[f'{label}:']
++    for i in range(0,len(data),24):rows.append(' db '+','.join(map(str,data[i:i+24])))
++    return rows
++def asm_bytes(text,label):
++    """Bytes de un bloque 'label:' seguido de lineas db en un .asm generado."""
++    out=bytearray();on=False
++    for line in text.splitlines():
++        t=line.split(';',1)[0].strip()
++        if not t:continue
++        if t.endswith(':'):
++            if on:break
++            on=(t[:-1]==label);continue
++        if on and t.startswith('db '):out+=bytes(int(x) for x in t[3:].split(','))
++    return bytes(out)
++assets=(B/'assets.asm').read_text()
++hud=asm_bytes(assets,'hud_bitmap_data')+asm_bytes(assets,'hud_attr_data')
++assert len(hud)==1728
++cut=assets.index('hud_bitmap_data:')
++(B/'assets_v12.asm').write_text(assets[:cut])
++SCREENS={
++ 'title':None,
++ 'phase':rle_decode((B/'phase_rle_v24.bin').read_bytes()),
++ 'gameover':rle_decode((B/'gameover_rle_v20.bin').read_bytes()),
++}
++HUD=hud
++from tools.v12_title import title as _title
++_tz,TITLE_STARS=_title()
++SCREENS['title']=_tz.to_scr()
++from tools import v12_screens as _scr
++SCREENS['phase']=_scr.phase(SCREENS['phase'])
++SCREENS['gameover']=_scr.gameover(SCREENS['gameover'])
++(B/'FASE_V12.scr').write_bytes(SCREENS['phase']);(B/'GAMEOVER_V12.scr').write_bytes(SCREENS['gameover'])
++(B/'TITULO_V12.scr').write_bytes(SCREENS['title'])
++# --- V1.2: HUD nuevo (la parte fija sale de tools/v12_hud.py, el logo ESF es el original) ---
++from tools.v12_hud import static_hud,hud_blob,tables as hud_tables
++_logo=[[1 if hud[y*8+c]&(128>>b) else 0 for c in range(8) for b in range(8)] for y in range(120,184)]
++HUD_Z=static_hud(_logo)
++HUD=hud_blob(HUD_Z)
++def build():
++    out=['; HALCONES ESTELARES 1.2 - datos generados por tools/v12_graficos.py']
++    t=compress(SCREENS['title']);out+=db_lines('title_lz',t)
++    p=compress(SCREENS['phase']);out+=db_lines('phase_lz',p)
++    h=compress(HUD);out+=db_lines('hud_lz',h)
++    for name,data in hud_tables():out+=db_lines(name,data)
++    from tools.v12_sprites import build as sprites_build
++    out+=sprites_build(SCREENS['title'])
++    out.append('title_star_cells:')
++    for c,r in TITLE_STARS:out.append(f' dw {0x5800+r*32+c}')
++    out.append(f'title_star_count equ {len(TITLE_STARS)}')
++    g=compress(SCREENS['gameover']);(B/'gameover_lz.bin').write_bytes(g)
++    for d,c in ((SCREENS['title'],t),(SCREENS['phase'],p),(HUD,h),(SCREENS['gameover'],g)):assert decompress(c)==d
++    (B/'v12_data.asm').write_text('\n'.join(out)+'\n')
++    print(f'V12 LZ: titulo {len(t)}, fase {len(p)}, HUD {len(h)}, game over {len(g)} bytes')
++build()
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' HALCONES_ESTELARES_CODIGO_FUENTE_1_1/tools/v12_hawk.py hal/tools/v12_hawk.py
+--- V1_1/tools/v12_hawk.py	1970-01-01 01:00:00.000000000 +0100
++++ V1_2/tools/v12_hawk.py	2026-11-12 01:24:48.712726726 +0100
+@@ -0,0 +1,144 @@
++"""Halcon nuevo del titulo (alas por geometria + cabeza y cuerpo a mano)."""
++import math
++from PIL import Image,ImageDraw
++from tools.v12_zx import *
++import tools.v12_hawk_wings as hawk
++hawk.LEAD=[(111,103),(104,98),(96,94),(86,91),(76,89),(64,88),(52,88),(40,88),(30,89),(22,90),(17,92),(14,96)]
++hawk.FINGERS=[(12,108),(15,115),(20,121),(27,126),(35,130),(44,133)]
++hawk.SECS=[(53,135),(62,136),(71,136),(80,135),(88,133),(96,130),(103,126),(109,121),(112,117)]
++HEAD_L=[ # x112..127, y88..103 (mitad izquierda; se refleja)
++"...........#####",
++".........#######",
++".......#########",
++"......##########",
++".....###########",
++"....##.#########",
++"....#....#######",
++"...##.##...#####",
++"...#.##.##..####",
++"...##.##.#..####",
++"....##..##.#####",
++"....#####.######",
++"...######.######",
++"...#######.#####",
++"....#######.####",
++"....########.###"]
++BEAK=[ # x120..135, y96..111 (tinta amarilla sobre papel cian)
++"....########....",
++"...##########...",
++"...###.##.###...",
++"...##########...",
++"....########....",
++"....########....",
++".....######.....",
++".....##..##.....",
++"......####......",
++"......####......",
++".......##.......",
++".......##.......",
++"................",
++"................",
++"................",
++"................"]
++BODY_L=[ # x112..127, y104..127 (pecho con escamas)
++"....############",
++"...#############",
++"..##############",
++"..###.#####.####",
++".###.#.###.#.###",
++".##.###.#.###.##",
++".###########.###",
++".##.#####.#####.",
++"..#.#.###.#.###.",
++"..##.###.#.#.###",
++"..##############",
++"..###.#####.####",
++"...#.#.###.#.###",
++"...#.###.#.###.#",
++"...###########.#",
++"....#.#####.####",
++"....#.#.###.#.##",
++".....###.#.###.#",
++".....##########.",
++"......#########.",
++"......##.####.##",
++".......#.##.#.##",
++".......##.###.##",
++"........########"]
++TAIL_L=[ # x120..127, y128..143 (cola blanca en abanico, plumas anchas)
++"########",
++"########",
++"########",
++".#######",
++".###.###",
++".###.###",
++"####.###",
++"###..###",
++"###.####",
++"###.####",
++"##..####",
++"##.#####",
++"##.####.",
++"#..###..",
++"#..##...",
++"...#...."]
++LEG_L=[ # x112..119, y128..143 (pata y garras amarillas)
++"....####",
++"....####",
++"...####.",
++"...###..",
++"...###..",
++"...##...",
++"..###...",
++"..##....",
++".####...",
++"######..",
++"##.#.##.",
++"#..#..#.",
++"#..#..#.",
++"...#....",
++"........",
++"........"]
++def mirror(rows):return [r+r[::-1] for r in rows]
++def head_left():
++    """Mitad izquierda de la cabeza (x112..127, y88..103): ceja fiera y ojo."""
++    half=[6,8,10,11,12,13,13,14,14,14,14,14,13,13,12,12]
++    rows=[]
++    for h in half:
++        rows.append(['.']*(16-h)+['#']*h)
++    def blk(y,a,b):
++        for i in range(a,b+1):rows[y-88][i]='.'
++    blk(92,4,6);blk(93,6,9);blk(94,8,11);blk(95,10,13)     # ceja: baja hacia el pico
++    blk(94,4,5);blk(95,4,8);blk(96,5,7)                     # ojo bajo la ceja
++    rows[95-88][6]='#'                                       # brillo
++    for y,i in ((99,2),(101,3),(103,4)):rows[y-88][i]='.'   # plumas de la mejilla
++    return [''.join(r) for r in rows]
++def draw(z):
++    z.clear(0,84,256,144)
++    w=hawk.wings()
++    for y in range(88,144):
++        for x in range(256):
++            if w[y][x] and not 112<=x<144:z.px[y][x]=1
++    # cuerpo y cabeza
++    for j,r in enumerate(mirror(head_left())):
++        for i,ch in enumerate(r):z.px[88+j][112+i]=1 if ch=='#' else 0
++    for j,r in enumerate(mirror(BODY_L)):
++        for i,ch in enumerate(r):z.px[104+j][112+i]=1 if ch=='#' else 0
++    for j,r in enumerate(mirror(TAIL_L)):
++        for i,ch in enumerate(r):z.px[128+j][120+i]=1 if ch=='#' else 0
++    for j,r in enumerate(LEG_L):
++        for i,ch in enumerate(r):
++            z.px[128+j][112+i]=1 if ch=='#' else 0
++            z.px[128+j][143-i]=1 if ch=='#' else 0
++    # pico: celdas de papel cian y tinta amarilla (cabeza maciza alrededor)
++    for j,r in enumerate(BEAK):
++        for i,ch in enumerate(r):z.px[96+j][120+i]=1 if ch=='#' else 0
++    # atributos
++    for r in range(11,18):
++        for c in range(0,32):
++            z.at[r][c]=A(WHT) if r<=13 else A(YEL)       # alas: coberteras blancas, remeras doradas
++    z.attr(14,11,18,16,A(CYN))                            # cabeza y cuerpo
++    z.attr(15,12,17,14,A(YEL,CYN))                        # pico sobre la cara
++    z.attr(15,16,17,18,A(WHT))                            # cola
++    z.attr(14,16,15,18,A(YEL));z.attr(17,16,18,18,A(YEL)) # patas
++    return z
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' HALCONES_ESTELARES_CODIGO_FUENTE_1_1/tools/v12_hawk_wings.py hal/tools/v12_hawk_wings.py
+--- V1_1/tools/v12_hawk_wings.py	1970-01-01 01:00:00.000000000 +0100
++++ V1_2/tools/v12_hawk_wings.py	2026-11-12 01:24:48.695049729 +0100
+@@ -0,0 +1,55 @@
++"""Halcon nuevo del titulo (coordenadas globales del Spectrum)."""
++import math
++from PIL import Image,ImageDraw
++LEAD=[(111,104),(104,99),(96,95),(88,91),(80,88),(72,86),(64,86),(54,87),(44,89),(34,91),(25,94),(18,98),(15,103)]
++# puntas de las primarias (dedos) y de las secundarias (festón)
++FINGERS=[(14,116),(18,123),(24,129),(31,133),(39,136),(48,138)]
++SECS=[(57,138),(66,138),(75,137),(84,135),(92,132),(100,128),(107,123),(111,119)]
++def outline():
++    pts=list(LEAD)
++    tips=FINGERS+SECS
++    # entre punta y punta, una muesca hacia dentro (separa las plumas)
++    prev=LEAD[-1]
++    for i,t in enumerate(tips):
++        if i>0:
++            a=tips[i-1];mx,my=(a[0]+t[0])/2,(a[1]+t[1])/2
++            # hacia el centro del ala
++            cx,cy=70,104;dx,dy=cx-mx,cy-my;l=math.hypot(dx,dy)
++            depth=7 if i<len(FINGERS) else 3
++            pts.append((mx+dx/l*depth,my+dy/l*depth))
++        pts.append(t)
++    return pts
++def draw_left(d):
++    d.polygon(outline(),fill=1)
++    tips=FINGERS+SECS
++    # lineas de separacion entre plumas: desde la muesca hacia el foco
++    for i in range(1,len(tips)):
++        a,t=tips[i-1],tips[i];mx,my=(a[0]+t[0])/2,(a[1]+t[1])/2
++        fx,fy=(66,100) if i<len(FINGERS)+1 else (86,104)
++        frac=0.62 if i<len(FINGERS)+1 else 0.45
++        d.line([(mx,my),(mx+(fx-mx)*frac,my+(fy-my)*frac)],fill=0)
++    # canones (raquis) punteados en las primarias
++    for t in FINGERS[:-1]:
++        fx,fy=66,100
++        for k in range(3,13,2):
++            q=k/30;d.point((t[0]+(fx-t[0])*q+1,t[1]+(fy-t[1])*q),fill=0)
++    # coberteras: dos filas de escamas
++    for row,(base,r,n) in enumerate((((108,110),(4,3),10),((104,103),(4,3),9),((100,96),(4,3),8))):
++        for k in range(n):
++            t=k/(n-1)
++            x=base[0]-t*(78,70,60)[row]
++            y=base[1]-6*math.sin(t*math.pi*0.9)+t*(0,1,2)[row]
++            d.arc((x-r[0],y-r[1],x+r[0],y+r[1]),10,170,fill=0)
++def wings():
++    im=Image.new('1',(256,192),0);d=ImageDraw.Draw(im);draw_left(d)
++    px=im.load();out=[[0]*256 for _ in range(192)]
++    for y in range(192):
++        for x in range(128):
++            if px[x,y]:out[y][x]=1;out[y][255-x]=1
++    return out
++if __name__=='__main__':
++    b=wings();im=Image.new('RGB',(256,64))
++    for y in range(64):
++        for x in range(256):
++            if b[84+y][x]:im.putpixel((x,y),(255,255,255))
++    im.resize((256*5,64*5),0).save('/tmp/wings.png')
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' HALCONES_ESTELARES_CODIGO_FUENTE_1_1/tools/v12_hud.py hal/tools/v12_hud.py
+--- V1_1/tools/v12_hud.py	1970-01-01 01:00:00.000000000 +0100
++++ V1_2/tools/v12_hud.py	2026-11-12 01:16:08.576435178 +0100
+@@ -0,0 +1,99 @@
++"""HUD 1.2: parte fija (va comprimida) + tablas para las partes que cambian."""
++from tools.v12_zx import ZX,A,BLK,BLU,RED,MAG,GRN,CYN,YEL,WHT
++from tools.v12_font import S5,BIG,T3,sctext,stext,ctext
++FACE={
++'feliz':["....######....","..##########..",".############.",".###..##..###.","####..##..####","##############","##############","##.########.##","###.######.###",".###......###.",".############.","..##########..","....######....","..............",],
++'apurado':["....######....","..##########..",".##.######.##.",".###.####.###.","####..##..####","####..##..####","##############","##############","####......####","###.######.###",".############.","..##########..","....######....","..............",],
++'vacia':["....#.##.#....","..#........#..","..............",".#..........#.","..............","#............#","..............","#............#","..............",".#..........#.","..............","..#........#..","....#.##.#....","..............",],
++}
++MOAI_ICON=["..###.","######",".#.#..","######",".####.",".####.","######"]
++def band(z,r,ink,label,x=None):
++    y0=r*8
++    for y in range(y0,y0+8):
++        for xx in range(192,256):z.px[y][xx]=0
++    z.attr(24,r,32,r+1,A(BLK,ink))
++    for x_,y in ((192,y0),(193,y0),(192,y0+1),(255,y0),(254,y0),(255,y0+1),(192,y0+7),(255,y0+7)):z.px[y][x_]=1
++    if x is None:sctext(z,224,y0+2,label)
++    else:stext(z,x,y0+2,label)
++def rails(z,r0,r1,ink):
++    z.vline(193,r0*8,r1*8);z.vline(254,r0*8,r1*8)
++    z.attr(24,r0,25,r1,A(ink));z.attr(31,r0,32,r1,A(ink))
++def static_hud(logo_rows):
++    """Lienzo con solo lo fijo. logo_rows = 64 filas x 64 px del logo ESF original."""
++    z=ZX();z.attr(0,0,32,24,A(WHT))
++    band(z,0,YEL,'PUNTOS');rails(z,1,4,YEL);z.attr(25,1,31,3,A(WHT))
++    stext(z,201,26,'REC');z.attr(25,3,31,4,A(CYN,0,0))
++    band(z,4,CYN,'VIDAS');rails(z,5,8,CYN)
++    for i in range(3):z.attr(25+i*2,5,27+i*2,8,A(YEL))
++    band(z,8,GRN,'ESCUDO');rails(z,9,11,GRN)
++    for k in range(8):                      # bordes superior e inferior de los 8 segmentos
++        x=200+k*6
++        for dx in range(5):z.plot(x+dx,73);z.plot(x+dx,78)
++    z.attr(25,9,31,10,A(GRN));z.attr(25,10,31,11,A(GRN))
++    band(z,11,MAG,'FASE',x=205);rails(z,12,14,MAG)
++    z.blit(234,98,MOAI_ICON)
++    stext(z,201,107,'OLEADA')
++    z.attr(25,12,31,13,A(MAG));z.attr(25,13,31,14,A(MAG,0,0))
++    for j,row in enumerate(logo_rows):
++        for i,v in enumerate(row):
++            if v:z.px[120+j][192+i]=1
++    z.attr(24,14,32,24,A(WHT));z.attr(24,14,25,24,A(RED));z.attr(31,14,32,24,A(RED))
++    z.attr(24,14,32,15,A(RED));z.attr(24,23,32,24,A(RED))
++    z.hline(196,252,113);z.hline(196,252,190);z.vline(193,116,188);z.vline(254,116,188)
++    for p in ((194,114),(195,114),(194,115),(253,114),(252,114),(253,115),(194,189),(195,189),(194,188),(253,189),(252,189),(253,188)):z.plot(*p)
++    return z
++def hud_blob(z):
++    """1536 bytes de bitmap (8 por linea, x192..255) + 192 de atributos (8 por fila)."""
++    out=bytearray()
++    for y in range(192):
++        for c in range(8):
++            v=0
++            for b in range(8):
++                if z.px[y][192+c*8+b]:v|=128>>b
++            out.append(v)
++    for r in range(24):out+=bytes(z.at[r][24:32])
++    return bytes(out)
++def glyph_bytes(rows,width_bits,shift):
++    """Filas de '#' a bytes, empezando en el bit 'shift' (0 = bit 7)."""
++    out=[]
++    for r in rows:
++        v=0
++        for i,ch in enumerate(r):
++            if ch=='#':
++                bit=shift+i
++                v|=1<<(width_bits-1-bit)
++        out.append(v)
++    return out
++def tables():
++    t=[]
++    big=[];[big.extend(glyph_bytes(BIG[str(d)],8,0)) for d in range(10)]
++    t.append(('hud_big_digits',big))                       # 7x8, bits 7..1
++    nib=[];[nib.extend(glyph_bytes(T3[str(d)],4,0)) for d in range(10)]
++    t.append(('hud_nibble_digits',nib))                    # 3x5 en un nibble (bits 3..1)
++    s5=[];[s5.extend(glyph_bytes(S5[str(d)],8,1)) for d in range(10)]
++    t.append(('hud_s5_digits',s5))                         # 5x5, bits 6..2
++    for k in ('feliz','apurado','vacia'):
++        fb=[]
++        for r in FACE[k][:13]:
++            v=0
++            for i,ch in enumerate(r):
++                if ch=='#':v|=1<<(15-(i+1))
++            fb+= [v>>8,v&255]
++        t.append(('hud_face_'+k,fb))                       # 13 filas x 2 bytes
++    # fila central de la barra del escudo para 0..8 segmentos (6 bytes)
++    bars=[]
++    for m in range(9):
++        bits=[0]*48
++        for k in range(8):
++            for dx in range(5):
++                if k<m or dx in (0,4):bits[k*6+dx]=1
++        for c in range(6):bars.append(sum(bits[c*8+b]<<(7-b) for b in range(8)))
++    t.append(('hud_shield_rows',bars))
++    # textos de estado del escudo (6 bytes x 5 filas, centrados en x200..247)
++    for name,txt in (('listo','LISTO'),('activo','ACTIVO'),('carga','CARGANDO')):
++        z=ZX();sctext(z,224,0,txt)
++        tb=[]
++        for y in range(5):
++            for c in range(6):tb.append(sum(z.px[y][200+c*8+b]<<(7-b) for b in range(8)))
++        t.append(('hud_txt_'+name,tb))
++    return t
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' HALCONES_ESTELARES_CODIGO_FUENTE_1_1/tools/v12_screens.py hal/tools/v12_screens.py
+--- V1_1/tools/v12_screens.py	1970-01-01 01:00:00.000000000 +0100
++++ V1_2/tools/v12_screens.py	2026-11-12 01:56:53.252220134 +0100
+@@ -0,0 +1,36 @@
++"""Pantallas de fase superada y GAME OVER 1.2: textos nuevos y estrellas.
++Las cifras (puntos, vidas, record) las escribe el juego en columnas fijas."""
++import random
++from tools.v12_zx import ZX,A,BLK,BLU,RED,MAG,GRN,CYN,YEL,WHT
++from tools.v12_font import ctext,text
++def _from(scr):
++    z=ZX()
++    for y in range(192):
++        for xb in range(32):
++            byte=scr[((y&0xc0)<<5)|((y&7)<<8)|((y&0x38)<<2)|xb]
++            for b in range(8):z.px[y][xb*8+b]=1 if byte&(128>>b) else 0
++    for r in range(24):
++        for c in range(32):z.at[r][c]=scr[6144+r*32+c]
++    return z
++def stars(z,seed,rows,n=50):
++    rnd=random.Random(seed)
++    def empty(c,r):return not any(z.px[r*8+j][c*8+i] for j in range(8) for i in range(8))
++    for k in range(n):
++        c,r=rnd.randrange(32),rnd.choice(rows)
++        if empty(c,r):
++            z.plot(c*8+rnd.randrange(1,7),r*8+rnd.randrange(1,7))
++            z.at[r][c]=rnd.choice([A(WHT),A(WHT,0,0),A(CYN,0,0),A(BLU)])
++def phase(scr):
++    z=_from(scr)
++    ctext(z,128,17,'¡MOAI DERROTADO!');z.attr(0,2,32,3,A(RED,0,1,1))
++    text(z,86,136,'PUNTOS');z.attr(0,17,32,18,A(YEL))       # cifras en columnas 16..21
++    text(z,26,144,'VIDAS');text(z,92,144,'RECORD')            # vidas en col 8, record 17..22
++    z.attr(0,18,32,19,A(WHT,0,0))
++    stars(z,5,[0,1,3,6,11,12,23])
++    return z.to_scr()
++def gameover(scr):
++    z=_from(scr)
++    ctext(z,128,137,'¡NUEVO RECORD!');z.attr(0,17,32,18,A(BLK,0,0))   # oculto hasta que haya record
++    text(z,84,161,'RECORD');z.attr(0,20,32,21,A(CYN))                 # cifras en columnas 16..21
++    stars(z,9,[8,9,13,22])
++    return z.to_scr()
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' HALCONES_ESTELARES_CODIGO_FUENTE_1_1/tools/v12_spr_art.py hal/tools/v12_spr_art.py
+--- V1_1/tools/v12_spr_art.py	1970-01-01 01:00:00.000000000 +0100
++++ V1_2/tools/v12_spr_art.py	2026-11-12 01:19:33.159668091 +0100
+@@ -0,0 +1,151 @@
++# Sprites nuevos (16x16, de frente hacia el jugador). '#' = tinta.
++CUERVO=[[
++"................",
++"#..............#",
++"##............##",
++"###....##....###",
++".###..####..###.",
++".####.#..#.####.",
++"..###.####.###..",
++"..############..",
++"...###.##.###...",
++"....##.##.##....",
++".....######.....",
++"......####......",
++"......#..#......",
++".......##.......",
++"................",
++"................"],[
++"................",
++"................",
++"................",
++".......##.......",
++"......####......",
++"......#..#......",
++"....########....",
++"..############..",
++".###.######.###.",
++"###..#.##.#..###",
++"##....####....##",
++"#....######....#",
++"......####......",
++"......#..#......",
++".......##.......",
++"................"]]
++CAZADOR=[[
++"................",
++"##............##",
++".##....##....##.",
++".###..####..###.",
++"..###.#..#.###..",
++"..############..",
++"...##########...",
++"....###..###....",
++"....##.##.##....",
++"...##..##..##...",
++"..##...##...##..",
++"..#....##....#..",
++".......##.......",
++"......#..#......",
++"................",
++"................"],[
++"................",
++"................",
++".......##.......",
++"......####......",
++"..##..#..#..##..",
++".###.######.###.",
++"################",
++"##.##########.##",
++"#...###..###...#",
++"....##.##.##....",
++"....#..##..#....",
++".......##.......",
++".......##.......",
++"......#..#......",
++"................",
++"................"]]
++HALCON=[[
++"................",
++".......##.......",
++"......####......",
++"..#...#..#...#..",
++".##..######..##.",
++".###.##..##.###.",
++"################",
++"#####.####.#####",
++"###...####...###",
++"##.....##.....##",
++"#......##......#",
++"......####......",
++".....#.##.#.....",
++"....#..##..#....",
++"................",
++"................"],[
++"................",
++".......##.......",
++"......####......",
++"......#..#......",
++"....########....",
++"...###.##.###...",
++"..############..",
++"..####.##.####..",
++".###...##...###.",
++".##....##....##.",
++"##.....##.....##",
++"#.....####.....#",
++".....#.##.#.....",
++"....#..##..#....",
++"................",
++"................"]]
++EXPLO=[[
++"................",
++"................",
++"................",
++"......#..#......",
++".....#.##.#.....",
++"....#.####.#....",
++".....######.....",
++"....########....",
++".....######.....",
++"....#.####.#....",
++".....#.##.#.....",
++"......#..#......",
++"................",
++"................",
++"................",
++"................"],[
++"................",
++"...#...#....#...",
++"....#..#...#....",
++".#...#.#..#...#.",
++"..#...####...#..",
++"...##.#..#.##...",
++"....##....##....",
++"#####......#####",
++"....##....##....",
++"...##.#..#.##...",
++"..#...####...#..",
++".#...#.#..#...#.",
++"....#..#...#....",
++"...#...#....#...",
++"................",
++"................"],[
++"#.......#......#",
++"................",
++"..#....#....#...",
++"................",
++"#...#......#...#",
++"................",
++"..#..........#..",
++"#..............#",
++"..#..........#..",
++"................",
++"#...#......#...#",
++"................",
++"..#....#....#...",
++"................",
++"#.......#......#",
++"................"]]
++LASER=["##","##","##","##","##",".."]     # disparo propio: haz de 2px
++PLASMA=[".#.","###",".#.","#.#"]          # disparo enemigo: rombo
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' HALCONES_ESTELARES_CODIGO_FUENTE_1_1/tools/v12_sprites.py hal/tools/v12_sprites.py
+--- V1_1/tools/v12_sprites.py	1970-01-01 01:00:00.000000000 +0100
++++ V1_2/tools/v12_sprites.py	2026-11-12 01:48:12.723424197 +0100
+@@ -0,0 +1,90 @@
++"""Sprites 1.2: enemigos nuevos (mismo sitio y tamano), cuervo 8x8 nuevo,
++explosion 16x16 en 3 tiempos (se desplaza al arrancar en $5B00), rombo de
++disparo enemigo y llama de motores. Parchea build/sprites_reloc_v22.bin."""
++from pathlib import Path
++from tools.v12_spr_art import CUERVO,CAZADOR,HALCON,EXPLO
++R=Path(__file__).resolve().parents[1]
++B=R/'build'
++def shifted(frames,w,h):
++    bpr=w//8+1;out=bytearray()
++    for fr in frames:
++        for ph in range(8):
++            for y in range(h):
++                for bx in range(bpr):
++                    v=0
++                    for px in range(8):
++                        sx=bx*8+px-ph
++                        if 0<=sx<w and fr[y][sx]=='#':v|=128>>px
++                    out.append(v)
++    return bytes(out)
++CROW8=[[
++"#......#",
++"##....##",
++".##..##.",
++"..####..",
++".#.##.#.",
++"..####..",
++"...##...",
++"...##..."],[
++"........",
++"...##...",
++"..####..",
++"########",
++"#.#..#.#",
++"..####..",
++".#.##.#.",
++"...##..."]]
++PLASMA=[".#......","###.....","###.....",".#......"]
++FLAME=[[".##..##.",".##..##.","..#..#..","........"],
++       [".##..##.","..#..#..","........","........"]]
++def build(title_scr):
++    blob=bytearray((B/'sprites_reloc_v22.bin').read_bytes())
++    def put(off,data):
++        assert len(blob)>=off+len(data);blob[off:off+len(data)]=data
++    put(0x300,shifted(CAZADOR,16,16))   # tipo 0 (amarillo)
++    put(0x600,shifted(CUERVO,16,16))    # tipo 1 (rojo)
++    put(0x900,shifted(HALCON,16,16))    # tipo 2 (cian)
++    put(0xcc0,shifted(CROW8,8,8))       # cuervos de la primera oleada (8x8)
++    put(0xc00,shifted(FLAME,8,4))       # llama (128 bytes, sitio de la explosion vieja)
++    assert len(blob)==0x1e20
++    del blob[0x1d40:]          # la copia de atributos del logo ya no hace falta (mascara en $F070)
++    # V1.2: la explosion del ESF (3 tiempos x 8 fases x 96 bytes) se queda con las
++    # fases pares (desplazamiento de 2 en 2 px: no se nota en una explosion).
++    # Se liberan 1.152 bytes de memoria baja para el codigo nuevo.
++    BL,SH,FR=0x0dc0,0x16c0,0x1bc0
++    blast=bytearray()
++    for f in range(3):
++        for ph in (0,2,4,6):blast+=blob[BL+f*768+ph*96:BL+f*768+ph*96+96]
++    shield=bytes(blob[SH:SH+1280]);frame=bytes(blob[FR:FR+384])
++    del blob[BL:]
++    blast_at=len(blob);blob+=blast
++    shield_at=len(blob);blob+=shield
++    frame_at=len(blob);blob+=frame
++    extra=bytearray()
++    shot_off=len(blob);extra+=shifted([PLASMA],8,4)
++    exp_off=len(blob)+len(extra)
++    for fr in EXPLO:
++        for row in fr:
++            v=int(''.join('1' if c=='#' else '0' for c in row),2);extra+=bytes([v>>8,v&255])
++    blob+=extra
++    (B/'sprites_reloc_v22.bin').write_bytes(blob)
++    lo=0x6000
++    asm=['; V1.2 punteros de sprites nuevos (generado por tools/v12_sprites.py)']
++    asm.append(f'frame_bitmap_low equ {lo+frame_at}')
++    # punteros de la explosion del ESF y del escudo, recolocados
++    ca=(B/'combat_assets_v22.asm').read_text()
++    cut=ca.index('ship_blast_phase_ptrs_f0:')
++    tail=['']
++    for f in range(3):
++        tail.append(f'ship_blast_phase_ptrs_f{f}:')
++        tail+=[f' dw {lo+blast_at+f*384+(p//2)*96}' for p in range(8)]
++    tail.append('shield_phase_ptrs:')
++    tail+=[f' dw {lo+shield_at+p*160}' for p in range(8)]
++    (B/'combat_assets_v22.asm').write_text(ca[:cut]+'\n'.join(tail)+'\n')
++    asm.append('enemy_shot_phase_ptrs:');asm+=[f' dw {lo+shot_off+p*8}' for p in range(8)]
++    for f in range(2):
++        asm.append(f'flame_phase_ptrs_f{f}:');asm+=[f' dw {lo+0xc00+f*64+p*8}' for p in range(8)]
++    asm.append(f'explosion_src equ {lo+exp_off}')
++    for f in range(3):
++        asm.append(f'explosion_phase_ptrs_f{f}:');asm+=[f' dw {0x5b00+(f*8+p)*48}' for p in range(8)]
++    return asm
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' HALCONES_ESTELARES_CODIGO_FUENTE_1_1/tools/v12_title.py hal/tools/v12_title.py
+--- V1_1/tools/v12_title.py	1970-01-01 01:00:00.000000000 +0100
++++ V1_2/tools/v12_title.py	2026-11-12 01:56:53.249352203 +0100
+@@ -0,0 +1,37 @@
++"""Titulo 1.2: el original con letras en degradado, halcon nuevo, cielo
++estrellado que titila y la parte baja con record y controles nuevos."""
++import random
++from pathlib import Path
++from tools.v12_zx import ZX,A,BLK,BLU,RED,MAG,GRN,CYN,YEL,WHT
++from tools.v12_font import ctext,text,width
++from tools import v12_hawk
++R=Path(__file__).resolve().parents[1]
++def title():
++    z=ZX.from_scr(str(R/'assets/HALCONES_ESTELARES_TITLE.scr'))
++    grad={1:A(YEL),2:A(YEL),3:A(YEL),4:A(RED),5:A(YEL),6:A(YEL),7:A(RED)}
++    for r,a in grad.items():
++        for c in range(32):
++            if z.at[r][c]&7==YEL:z.at[r][c]=a
++    credit=[row[:] for row in z.px[148:155]]
++    v12_hawk.draw(z)                          # borra 84..143 y dibuja el halcon
++    z.clear(0,144,256,192)
++    for j,row in enumerate(credit):z.px[145+j]=row
++    z.attr(0,18,32,19,A(WHT))
++    # RECORD: la etiqueta es fija; las 6 cifras se escriben en columnas 16..21
++    text(z,84,153,'RECORD');z.attr(0,19,32,20,A(YEL))
++    ctext(z,128,161,'O-P/6-7 MOVER   A/8 ESCUDO');z.attr(0,20,32,21,A(CYN))
++    ctext(z,128,169,'SPACE/0 FUEGO   H PAUSA');z.attr(0,21,32,22,A(GRN))
++    ctext(z,128,177,'KEMPSTON: PULSA SU FUEGO');z.attr(0,22,32,23,A(WHT,0,0))
++    ctext(z,128,185,'PULSA FUEGO');z.attr(0,23,32,24,A(YEL,0,1,1))
++    # cielo: estrellas en celdas vacias (filas 0..10); su atributo titila
++    rnd=random.Random(3);stars=[]
++    def empty(c,r):return not any(z.px[r*8+j][c*8+i] for j in range(8) for i in range(8))
++    tries=0
++    while len(stars)<36 and tries<2000:
++        tries+=1
++        c,r=rnd.randrange(32),rnd.randrange(0,11)
++        if (c,r) in stars or not empty(c,r):continue
++        z.plot(c*8+rnd.randrange(1,7),r*8+rnd.randrange(1,7))
++        z.at[r][c]=rnd.choice([A(WHT),A(WHT,0,0),A(CYN,0,0),A(BLU)])
++        stars.append((c,r))
++    return z,stars
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' HALCONES_ESTELARES_CODIGO_FUENTE_1_1/tools/v12_zx.py hal/tools/v12_zx.py
+--- V1_1/tools/v12_zx.py	1970-01-01 01:00:00.000000000 +0100
++++ V1_2/tools/v12_zx.py	2026-11-12 01:16:08.576577505 +0100
+@@ -0,0 +1,69 @@
++"""Lienzo ZX Spectrum: pixeles 256x192 + atributos 32x24 (tinta/papel/brillo por celda)."""
++from PIL import Image
++P=[(0,0,0),(0,0,205),(205,0,0),(205,0,205),(0,205,0),(0,205,205),(205,205,0),(205,205,205)]
++B=[(0,0,0),(0,0,255),(255,0,0),(255,0,255),(0,255,0),(0,255,255),(255,255,0),(255,255,255)]
++BLK,BLU,RED,MAG,GRN,CYN,YEL,WHT=range(8)
++def A(ink,paper=0,bright=1,flash=0):return ink|paper<<3|bright<<6|flash<<7
++class ZX:
++    def __init__(s):s.px=[[0]*256 for _ in range(192)];s.at=[[A(WHT)]*32 for _ in range(24)]
++    @classmethod
++    def from_scr(c,path):
++        s=c();m=open(path,'rb').read()
++        for y in range(192):
++            for xb in range(32):
++                byte=m[((y&0xc0)<<5)|((y&7)<<8)|((y&0x38)<<2)|xb]
++                for b in range(8):s.px[y][xb*8+b]=1 if byte&(128>>b) else 0
++        for r in range(24):
++            for c in range(32):s.at[r][c]=m[6144+r*32+c]
++        return s
++    @classmethod
++    def from_mem(c,m):
++        s=c()
++        for y in range(192):
++            for xb in range(32):
++                byte=m[0x4000+(((y&0xc0)<<5)|((y&7)<<8)|((y&0x38)<<2)|xb)]
++                for b in range(8):s.px[y][xb*8+b]=1 if byte&(128>>b) else 0
++        for r in range(24):
++            for c in range(32):s.at[r][c]=m[0x5800+r*32+c]
++        return s
++    def clear(s,x0,y0,x1,y1):
++        for y in range(y0,y1):
++            for x in range(x0,x1):s.px[y][x]=0
++    def plot(s,x,y,v=1):
++        if 0<=x<256 and 0<=y<192:s.px[y][x]=v
++    def attr(s,c0,r0,c1,r1,a):
++        for r in range(r0,r1):
++            for c in range(c0,c1):s.at[r][c]=a
++    def blit(s,x,y,rows,mode='or'):
++        for j,row in enumerate(rows):
++            for i,ch in enumerate(row):
++                if ch in '#X@':s.plot(x+i,y+j,1)
++                elif mode=='set' and ch in '.':s.plot(x+i,y+j,0)
++    def hline(s,x0,x1,y,pat=None):
++        for x in range(x0,x1):
++            if pat is None or pat[(x-x0)%len(pat)]=='#':s.plot(x,y)
++    def vline(s,x,y0,y1,pat=None):
++        for y in range(y0,y1):
++            if pat is None or pat[(y-y0)%len(pat)]=='#':s.plot(x,y)
++    def rect(s,x0,y0,x1,y1):
++        s.hline(x0,x1,y0);s.hline(x0,x1,y1-1);s.vline(x0,y0,y1);s.vline(x1-1,y0,y1)
++    def img(s,scale=3):
++        im=Image.new('RGB',(256,192));p=im.load()
++        for y in range(192):
++            for x in range(256):
++                a=s.at[y>>3][x>>3];pal=B if a&64 else P
++                p[x,y]=pal[a&7] if s.px[y][x] else pal[(a>>3)&7]
++        return im.resize((256*scale,192*scale),Image.NEAREST)
++
++def to_scr(z):
++    m=bytearray(6912)
++    for y in range(192):
++        for xb in range(32):
++            v=0
++            for b in range(8):
++                if z.px[y][xb*8+b]:v|=128>>b
++            m[((y&0xc0)<<5)|((y&7)<<8)|((y&0x38)<<2)|xb]=v
++    for r in range(24):
++        for c in range(32):m[6144+r*32+c]=z.at[r][c]
++    return bytes(m)
++ZX.to_scr=to_scr
+diff -ruN '--exclude=__pycache__' '--exclude=build' '--exclude=*.tap' '--exclude=*.patch' '--exclude=*.md' '--exclude=*.txt' '--exclude=*.png' HALCONES_ESTELARES_CODIGO_FUENTE_1_1/tools/z80_assembler.py hal/tools/z80_assembler.py
+--- V1_1/tools/z80_assembler.py	2026-11-12 00:05:40.151727082 +0100
++++ V1_2/tools/z80_assembler.py	2026-11-12 01:27:23.512334647 +0100
+@@ -135,6 +135,7 @@
+     if x=='(de)' and y=='a':self.emit(0x12);return
+     if y=='a':self.emit(0x32);self.w(self.ex(x[1:-1]));return
+     if y=='hl':self.emit(0x22);self.w(self.ex(x[1:-1]));return
++    if y in ('bc','de','sp'):self.emit(0xed,{'bc':0x43,'de':0x53,'sp':0x73}[y]);self.w(self.ex(x[1:-1]));return
+    raise ValueError('unsupported LD '+s)
+   if op in ('jp','call'):
+    if len(args)==1:

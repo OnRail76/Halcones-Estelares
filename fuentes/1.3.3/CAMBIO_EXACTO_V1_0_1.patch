@@ -1,0 +1,72 @@
+--- FINAL_1_0/src/gameplay.asm
++++ FINAL_1_0_1/src/gameplay.asm
+@@ -1979,6 +1979,11 @@
+ crow_scout_return:
+  ld a,(ix+1)
+  sub 3
++ ; FINAL 1.0.1: con Y<3 la resta daba la vuelta (253..255) y el Crow se
++ ; pintaba fuera de la tabla de 192 lineas: el compositor escribia sobre el
++ ; propio codigo (call $8635 -> call $1035) y el Spectrum se reseteaba o se
++ ; colgaba. Si la subida se pasa del borde, el Crow aterriza en su sitio.
++ jp c,crow_scout_home
+  ld b,a
+  ld a,(ix+5)              ; Initial home Y for this Crow.
+  cp b
+@@ -1986,6 +1991,8 @@
+  ld a,b
+  ld (ix+1),a
+  jp crow_wave_next
++crow_scout_home:
++ ld a,(ix+5)
+ crow_scout_joins:
+  ld (ix+1),a
+  ld (ix+2),1
+--- FINAL_1_0/src/arcade_compositor.asm
++++ FINAL_1_0_1/src/arcade_compositor.asm
+@@ -14,6 +14,8 @@
+ ; Requires scanline_table: DW address for 192 scanlines, built in asset generator.
+ 
+ sprite_render:
++ call sprite_fits         ; FINAL 1.0.1: nunca pintar fuera de las 192 lineas
++ ret nc
+  ld a,(spr_x)
+  and 7
+  add a,a
+@@ -233,6 +235,8 @@
+ ; Spectrum scanline layout is handled through precomputed scanline_table.
+ ; Sets REST_COL, REST_SCAN, REST_ROWS; spr_x/y,cols,height as parameters.
+ composite_setup:
++ call sprite_fits         ; FINAL 1.0.1: si no cabe, no se restaura ni presenta
++ jp nc,composite_skip
+  ld a,(spr_x)
+  rrca
+  rrca
+@@ -250,6 +254,28 @@
+  ld (rest_rows),a
+  ret
+ 
++; Abandona sprite_restore / sprite_present (ambas empiezan con la llamada).
++composite_skip:
++ pop hl
++ ret
++
++; FINAL 1.0.1: comprueba el contrato del compositor (0 <= spr_y y
++; spr_y + spr_height <= 192). Carry = cabe. Conserva BC.
++sprite_fits:
++ push bc
++ ld a,(spr_height)
++ ld b,a
++ ld a,(spr_y)
++ add a,b
++ jp c,sprite_fits_no
++ cp 193
++ pop bc
++ ret
++sprite_fits_no:
++ or a
++ pop bc
++ ret
++
+ ; Background -> work RAM. This operates on OLD sprite rectangles, before
+ ; composing any object for the next frame; overlap cannot destroy neighbors.
+ 

@@ -1,0 +1,120 @@
+diff -ruN -x __pycache__ -x '*.tap' -x '*.png' -x '*.bin' -x '*.scr' -x '*.gif' -x 'CAMBIOS_V1_3*.patch' HALCONES_ESTELARES_CODIGO_FUENTE_1_3_1/LEEME_FUENTES_FINAL_1_0.md hal/LEEME_FUENTES_FINAL_1_0.md
+--- HALCONES_ESTELARES_CODIGO_FUENTE_1_3_1/LEEME_FUENTES_FINAL_1_0.md	2026-11-12 11:50:38.118227905 +0100
++++ hal/LEEME_FUENTES_FINAL_1_0.md	2026-11-12 12:18:40.639046997 +0100
+@@ -1,9 +1,19 @@
+-# HALCONES ESTELARES — Código fuente (edición final 1.0 y versiones 1.1, 1.2, 1.3 y 1.3.1)
++# HALCONES ESTELARES — Código fuente (edición final 1.0 y versiones 1.1, 1.2, 1.3, 1.3.1 y 1.3.2)
+ 
+ **Autor y dirección:** Tony C. Ware · **Plataforma:** ZX Spectrum 48K · **Lenguaje:** Z80 ensamblador · **Año:** 2026.
+ 
+ Este paquete contiene **los fuentes verdaderos de la V2.8.9 estabilizada**, aprobada y publicada como edición **FINAL 1.0**. No corresponde a la V2.8.4 defectuosa ni a los experimentos de puntuación oculta. Se ha recompilado y comprobado byte a byte.
+ 
++## VERSIÓN 1.3.2: melodía del título una sola vez
++
++Parte de la 1.3.1. El cambio exacto respecto a la 1.3.1 está en `CAMBIOS_V1_3_2.patch`.
++
++- La melodía del título suena **una vez** cada vez que se llega al título (al cargar y al volver tras el Game Over) y después silencio hasta pulsar fuego. Antes se repetía sin fin (`title_screen.asm`: punto de vuelta 0 en `music_start`). Las músicas de Game Over, récord y fase superada ya sonaban una sola vez.
++- `tests/test_v13_galaga.py` añade `test_musica_titulo_una_vez`: suena al llegar, silencio desde el segundo 10 hasta el 25, y lo mismo al volver al título tras una partida.
++- Batería completa: pasa todo salvo los tres antiguos de siempre (`test_v282`, `test_v284` y el final de `test_v283`).
++
++**SHA-256 del TAP 1.3.2:** `456d80834563321eb171b6f52e1f23d7c467b6f330b7b2d9e13eb9894605fe6b` (`HALCONES_ESTELARES_1_3_2.tap`).
++
+ ## VERSIÓN 1.3.1: sonido más seguido e insignia que brilla
+ 
+ Parte de la 1.3. El cambio exacto respecto a la 1.3 está en `CAMBIOS_V1_3_1.patch`.
+diff -ruN -x __pycache__ -x '*.tap' -x '*.png' -x '*.bin' -x '*.scr' -x '*.gif' -x 'CAMBIOS_V1_3*.patch' HALCONES_ESTELARES_CODIGO_FUENTE_1_3_1/SHA256_TAP_FINAL.txt hal/SHA256_TAP_FINAL.txt
+--- HALCONES_ESTELARES_CODIGO_FUENTE_1_3_1/SHA256_TAP_FINAL.txt	2026-11-12 11:50:38.128025265 +0100
++++ hal/SHA256_TAP_FINAL.txt	2026-11-12 12:18:40.646529062 +0100
+@@ -1,3 +1,4 @@
++456d80834563321eb171b6f52e1f23d7c467b6f330b7b2d9e13eb9894605fe6b  HALCONES_ESTELARES_1_3_2.tap
+ cb45c1889200fb89119093290373329f17b75a45ec43789683d976a3c110f96a  HALCONES_ESTELARES_1_3_1.tap
+ 2dd9b9f442544e8a792db3b747c946fc452404ecdfa0f3d597a445ce4adf36d7  HALCONES_ESTELARES_1_3.tap
+ 014e470ca2462b798242041e7fbc46f5b4eccedeb1756858af38f48695c4934f  HALCONES_ESTELARES_1_2.tap
+diff -ruN -x __pycache__ -x '*.tap' -x '*.png' -x '*.bin' -x '*.scr' -x '*.gif' -x 'CAMBIOS_V1_3*.patch' HALCONES_ESTELARES_CODIGO_FUENTE_1_3_1/build/starter.asm hal/build/starter.asm
+--- HALCONES_ESTELARES_CODIGO_FUENTE_1_3_1/build/starter.asm	2026-11-12 11:50:40.194632841 +0100
++++ hal/build/starter.asm	2026-11-12 12:15:36.580729738 +0100
+@@ -421,8 +421,8 @@
+ title_screen_wait:
+  call kempston_detect          ; V1.1: hay Kempston? (bus flotante = no)
+  call title_record_draw        ; V1.2: record de la sesion
+- ld hl,tune_title              ; V1.2: melodia del titulo, en bucle
+- ld de,tune_title
++ ld hl,tune_title              ; V1.2: melodia del titulo; V1.3.2: suena UNA
++ ld de,0                       ; vez cada vez que se llega al titulo y luego silencio
+  call music_start
+  ld a,75                     ; A leisurely attract-mode baseline hold, 1.5s PAL.
+  ld (title_pulse_countdown),a
+diff -ruN -x __pycache__ -x '*.tap' -x '*.png' -x '*.bin' -x '*.scr' -x '*.gif' -x 'CAMBIOS_V1_3*.patch' HALCONES_ESTELARES_CODIGO_FUENTE_1_3_1/src/title_screen.asm hal/src/title_screen.asm
+--- HALCONES_ESTELARES_CODIGO_FUENTE_1_3_1/src/title_screen.asm	2026-11-12 01:46:39.198048794 +0100
++++ hal/src/title_screen.asm	2026-11-12 12:11:17.940863052 +0100
+@@ -65,8 +65,8 @@
+ title_screen_wait:
+  call kempston_detect          ; V1.1: hay Kempston? (bus flotante = no)
+  call title_record_draw        ; V1.2: record de la sesion
+- ld hl,tune_title              ; V1.2: melodia del titulo, en bucle
+- ld de,tune_title
++ ld hl,tune_title              ; V1.2: melodia del titulo; V1.3.2: suena UNA
++ ld de,0                       ; vez cada vez que se llega al titulo y luego silencio
+  call music_start
+  ld a,75                     ; A leisurely attract-mode baseline hold, 1.5s PAL.
+  ld (title_pulse_countdown),a
+diff -ruN -x __pycache__ -x '*.tap' -x '*.png' -x '*.bin' -x '*.scr' -x '*.gif' -x 'CAMBIOS_V1_3*.patch' HALCONES_ESTELARES_CODIGO_FUENTE_1_3_1/tests/test_v13_galaga.py hal/tests/test_v13_galaga.py
+--- HALCONES_ESTELARES_CODIGO_FUENTE_1_3_1/tests/test_v13_galaga.py	2026-11-12 03:21:10.238669107 +0100
++++ hal/tests/test_v13_galaga.py	2026-11-12 12:15:04.159109008 +0100
+@@ -10,7 +10,9 @@
+ 5. Sonido: el efecto suena tambien a mitad de tick (interrupcion intermedia),
+    no solo al final, y el juego sigue a 25 ticks/s.
+ 6. La insignia ESF brilla (franja diagonal de color) al empezar la oleada y
+-   vuelve a quedar blanca; pantalla y sombra iguales."""
++   vuelve a quedar blanca; pantalla y sombra iguales.
++7. La melodia del titulo suena una vez cada vez que se llega al titulo (al
++   cargar y despues de cada Game Over) y luego hay silencio."""
+ import sys,json
+ from pathlib import Path
+ R=Path(__file__).resolve().parents[1]
+@@ -155,7 +157,43 @@
+     assert all(m[0x5800+r*32+c]==0x47 and m[0xf100+r*32+c]==0x47 for r in range(15,23) for c in range(25,31))
+     s.screen(str(R/'build'/'V13_INSIGNIA.png'))
+ 
++def title_music(s,start):
++    """Cambios del altavoz por segundo desde que se llega al titulo."""
++    z=s.z;outs=[];op=s.port_out
++    def po(port,v):
++        if port&1==0:outs.append(s.frames)
++        op(port,v)
++    z.port_out=po
++    for f in range(50*25):s.frame(())
++    z.port_out=op
++    per=[0]*25
++    for x in outs:per[(x-start)//50]+=1
++    return per
++
++def test_musica_titulo_una_vez():
++    s=Speccy(tap=TAP,watch=False);m=s.z.m;z=s.z
++    for f in range(400):
++        s.frame(())
++        if m[S['mus_ptr']]|m[S['mus_ptr']+1]:break
++    per=title_music(s,s.frames)
++    assert sum(per[:3])>500,('la melodia suena al llegar',per)
++    assert sum(per[10:])==0,('y despues silencio',per)
++    # partida y Game Over: al volver al titulo suena otra vez, una vez
++    for f in range(40):s.frame({'SPACE'} if f<6 else ())
++    assert m[S['card_ticks']] or m[S['enemy_count']],'empieza la partida'
++    m[S['player_take_hit']]=0xc9
++    m[S['player_lives']]=0;m[S['shield_invulnerable']]=60
++    t0=S['tune_title'];seen=False
++    for f in range(3000):
++        s.frame({'SPACE'} if seen and f%40<5 else ())
++        seen|=m[S['gameover_mode']]==1
++        p=m[S['mus_ptr']]|m[S['mus_ptr']+1]<<8
++        if seen and t0<=p<t0+8:break
++    assert seen and t0<=p<t0+8,'vuelve al titulo con su melodia'
++    per2=title_music(s,s.frames)
++    assert sum(per2[:3])>500 and sum(per2[10:])==0,per2
++
+ if __name__=='__main__':
+-    for t in (test_disparo,test_formacion_y_fondos,test_atributos_coherentes,test_sonido_mitad_de_tick,test_brillo_insignia):
++    for t in (test_disparo,test_formacion_y_fondos,test_atributos_coherentes,test_sonido_mitad_de_tick,test_brillo_insignia,test_musica_titulo_una_vez):
+         t();print('PASS',t.__name__,flush=True)
+-    print('PASS V1.3: 2 balas a 12 px, 10 cuervos / 6 enemigos, fondo por fase, atributos coherentes, sonido a mitad de tick, brillo de la insignia')
++    print('PASS V1.3: 2 balas a 12 px, 10 cuervos / 6 enemigos, fondo por fase, atributos coherentes, sonido a mitad de tick, brillo de la insignia, melodia del titulo una vez')

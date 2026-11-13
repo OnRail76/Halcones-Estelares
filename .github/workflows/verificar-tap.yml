@@ -1,5 +1,5 @@
-# Verificación de solo lectura: no hace commits, pushes ni publica Releases.
-name: Verificar HALCONES ESTELARES (v1.0 y v1.3.2)
+# Comprueba releases históricas y v1.3.3. Solo lectura: jamás publica ni hace pushes.
+name: Verificar HALCONES ESTELARES (v1.0 / v1.3.2 / v1.3.3)
 
 on:
   push:
@@ -7,11 +7,13 @@ on:
     paths:
       - 'JUEGO/**'
       - 'fuentes/1.3.2/**'
+      - 'fuentes/1.3.3/**'
       - '.github/workflows/verificar-tap.yml'
   pull_request:
     paths:
       - 'JUEGO/**'
       - 'fuentes/1.3.2/**'
+      - 'fuentes/1.3.3/**'
       - '.github/workflows/verificar-tap.yml'
   workflow_dispatch:
 
@@ -22,15 +24,23 @@ jobs:
   verificar-taps:
     runs-on: ubuntu-latest
     steps:
-      - name: Descargar repositorio
+      - name: Clonar
         uses: actions/checkout@v4
-      - name: Instalar Pillow para los generadores de gráficos
-        run: python3 -m pip install Pillow
-      - name: Reconstruir V1.3.2 desde los fuentes Z80
+      - name: Dependencias
+        run: python3 -m pip install Pillow pytest
+      - name: Reconstruir v1.3.2 histórica
         run: python3 fuentes/1.3.2/build.py
-      - name: Comprobar los TAP originales y el reconstruido
+      - name: Reconstruir v1.3.3 actual
+        run: python3 fuentes/1.3.3/build.py
+      - name: Verificar hashes y paridad de binarios
+        shell: bash
         run: |
           set -euo pipefail
-          echo "fca50d5b7b1b81bbfdf5141853a5a4905568ce660d2d57824162bfe0c4c8e648  JUEGO/HALCONES_ESTELARES_FINAL_1_0.tap" | sha256sum -c -
+          echo "fca50d5b7b1bbfdf5141853a5a4905568ce660d2d57824162bfe0c4c8e648  JUEGO/HALCONES_ESTELARES_FINAL_1_0.tap" | sha256sum -c -
           echo "456d80834563321eb171b6f52e1f23d7c467b6f330b7b2d9e13eb9894605fe6b  JUEGO/HALCONES_ESTELARES_1_3_2.tap" | sha256sum -c -
           echo "456d80834563321eb171b6f52e1f23d7c467b6f330b7b2d9e13eb9894605fe6b  fuentes/1.3.2/build/HALCONES_ESTELARES_V281.tap" | sha256sum -c -
+          echo "0db551592d01900287f0dad4754b840589075fb50ae3e7405ea66dbf21266ddf  JUEGO/HALCONES_ESTELARES_1_3_3.tap" | sha256sum -c -
+          echo "0db551592d01900287f0dad4754b840589075fb50ae3e7405ea66dbf21266ddf  fuentes/1.3.3/build/HALCONES_ESTELARES_V281.tap" | sha256sum -c -
+          cmp JUEGO/HALCONES_ESTELARES_1_3_3.tap fuentes/1.3.3/build/HALCONES_ESTELARES_V281.tap
+      - name: Batería vigente v1.3.3
+        run: cd fuentes/1.3.3 && python3 -m pytest -q

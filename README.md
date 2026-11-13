@@ -6,64 +6,46 @@
 
 **ZX Spectrum 48K · Código máquina Z80 · © 2026 Tony C. Ware**
 
-**[DESCARGAR LA VERSIÓN 1.3.2](https://github.com/OnRail76/Halcones-Estelares/releases/tag/v1.3.2)** · [TAP en el repositorio](JUEGO/HALCONES_ESTELARES_1_3_2.tap) · [Código fuente reproducible](fuentes/1.3.2/README.md)
+**[DESCARGAR LA v1.3.3](https://github.com/OnRail76/Halcones-Estelares/releases/tag/v1.3.3)** · [TAP 1.3.3](JUEGO/HALCONES_ESTELARES_1_3_3.tap) · [Código fuente Z80 v1.3.3](fuentes/1.3.3/README.md)
 
 ## 1988. El futuro
 
-La recién formada **Fuerza Espacial Europea**, una facción secreta de los servicios de protección de Europa, detecta señales de radio y pulsos de energía que provienen de **Europa, la luna de Júpiter**.
+La **Fuerza Espacial Europea** envía al **ESF-01** rumbo a **Europa, luna de Júpiter**, tras la desaparición de varias sondas. En el vacío aguardan aves cósmicas cuyo propósito es **invadir, destruir y COMER**. ¿Quién las dirige? **¡Sus gritos se oirán en el Cosmos!**
 
-Tras perder el contacto con varias sondas enviadas para investigar, llegó el momento de estrenar el **ESF-01**, el caza espacial más poderoso del mundo.
+## El juego
 
-Nadie esperaba lo que se encontraron en el vacío sideral.
+Arcade de seis oleadas por fase contra **CROW, HARPY, VULTURE y OSPREY**, antes del temible **MOAI MONOLITH**. Tres vidas, escudo, marcador y récord. Primera formación con **10 CROW**; el resto de formaciones emplean seis enemigos. Dos disparos propios simultáneos y dificultad progresiva.
 
-**Aves cósmicas con el único propósito de invadir, destruir y COMER.**
-
-¿Pero qué o quién las dirige?
-
-Sube a bordo del **ESF-01**, piloto. Es el momento de luchar.
-
-**¡Sus gritos se oirán en el Cosmos!**
-
-## El arcade
-
-Un matamarcianos de acción inmediata: **CROW, HARPY, VULTURE, OSPREY** y el temible **MOAI MONOLITH**. Seis oleadas por fase, tres vidas, escudo de emergencia, récord y escenarios cósmicos que cambian al avanzar.
-
-La versión 1.3.2 reúne el ritmo ajustado a 25 actualizaciones por segundo, diez CROW en la formación inicial, disparos más rápidos y limitados a dos a la vez, cuatro fondos estelares, efectos de sonido mejorados y la melodía del título que suena una sola vez por visita.
+**v1.3.3:** efectos beeper reorganizados en golpes cortos; **16 estrellas móviles**; retirados los fondos espaciales lejanos para reducir choques de atributos. Se conservan Júpiter y la luna del jefe. La música del título se reproduce **una vez** al entrar en la pantalla. [Historial de cambios](docs/CAMBIOS_1_3_3.md).
 
 ## Controles
 
-| Control | Acción |
+| Entrada | Acción |
 |---|---|
-| **O / P** | Izquierda / derecha |
-| **ESPACIO** | Disparar, iniciar desde el título |
-| **A / Q** | Escudo |
-| **H** | Pausa / reanudar |
-| **Sinclair 6 / 7 / 0** | Izquierda / derecha / disparo; 8 o 9 para escudo |
-| **Kempston** | Se selecciona al empezar desde el título pulsando FIRE |
+| O / P | Mover a izquierda / derecha |
+| ESPACIO | Disparar e iniciar con teclado |
+| A o Q | Escudo |
+| H | Pausa |
+| Sinclair 6 / 7 / 0 | Mover y disparar; 8/9 para escudo |
+| Kempston | Iniciar desde el título con FIRE |
 
-## Descargas y código
+## Descargas
 
-- **[Release 1.3.2: juego, fuentes y edición gráfica](https://github.com/OnRail76/Halcones-Estelares/releases/tag/v1.3.2)**.
-- [TAP 1.3.2](JUEGO/HALCONES_ESTELARES_1_3_2.tap) y [ZIP con el TAP](JUEGO/HALCONES_ESTELARES_1_3_2_JUEGO.zip).
-- [Fuentes del Z80 1.3.2](fuentes/1.3.2/README.md) y [historial de mejoras](docs/CAMBIOS_1_3_2.md).
-- [Edición 1.0 original, conservada íntegra](https://github.com/OnRail76/Halcones-Estelares/releases/tag/v1.0).
+- [Release v1.3.3](https://github.com/OnRail76/Halcones-Estelares/releases/tag/v1.3.3): TAP, paquete para jugar y código fuente reproducible.
+- [Fuentes de v1.3.3](fuentes/1.3.3/README.md) y [TAP original](JUEGO/HALCONES_ESTELARES_1_3_3.tap).
+- [Release v1.3.2](https://github.com/OnRail76/Halcones-Estelares/releases/tag/v1.3.2): cinco **carátulas aprobadas**, oficial ESF-01 negra y PDF históricos de la edición 1.0. **No modificar las carátulas ni colocarles número de versión.**
+- [Release v1.0](https://github.com/OnRail76/Halcones-Estelares/releases/tag/v1.0): primera edición y documentación visual original.
 
-Los PDF ilustrados anteriores corresponden a la edición **1.0**; el historial de cambios detalla las novedades hasta 1.3.2. Las cinco carátulas originales aprobadas siguen siendo las mismas; **ninguna lleva un número de versión impreso**.
+Los PDF históricos no representan todos los ajustes de v1.3.3; el historial de cambios sí.
 
-## Integridad
+## Compilación e integridad
 
-TAP 1.3.2 SHA-256:
+`python3 fuentes/1.3.3/build.py` reconstruye el TAP **idéntico byte a byte**. Las ocho secciones de la cinta tienen paridad XOR correcta; **24 pruebas vigentes superadas**. Tres regresiones viejas con rutas de desarrollo absolutas están archivadas, fuera de la suite actual; no se afirma verificación en hardware físico.
 
-`456d80834563321eb171b6f52e1f23d7c467b6f330b7b2d9e13eb9894605fe6b`
-
-El código de esta publicación ha sido reconstruido byte a byte desde un banco fuente limpio. Los tests automatizados son un complemento a las pruebas en Fuse, no una certificación de funcionamiento en hardware físico.
+**SHA-256 de v1.3.3:** `0db551592d01900287f0dad4754b840589075fb50ae3e7405ea66dbf21266ddf`
 
 ## Licencias y créditos
 
-**© 2026 Tony C. Ware · Dirección y creación del videojuego.** Asistencia IA: OpenAI GPT y Anthropic Claude.
-
-- [Licencia MIT asistida por IA — English](LICENSE)
-- [Licencia MIT asistida por IA — castellano](LICENSE_ES.md)
-- [Recursos gráficos y carátulas — derechos reservados](LICENCIA_GRAFICOS.md)
+**Autor y dirección creativa: Tony C. Ware.** Asistencia IA: OpenAI GPT y Anthropic Claude. Código y herramientas: MIT asistida por IA ([inglés](LICENSE), [castellano](LICENSE_ES.md)). Gráficos, sprites, logos y carátulas: [derechos reservados](LICENCIA_GRAFICOS.md).
 
 **¡Sus gritos se oirán en el Cosmos!**

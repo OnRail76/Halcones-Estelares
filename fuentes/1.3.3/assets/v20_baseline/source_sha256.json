@@ -1,0 +1,16 @@
+{
+  "video.asm": "02beed36020149252033a1dace9154aacfa66b5c50a5745105a3fcb05ae87377",
+  "irq_im2_v15.asm": "a2cde3c4b28fbdd1bef83b04df7cc746a093eb5c7b2b83ff541a2632b2036982",
+  "main.asm": "988965a81effc0ed48160b1e271f070698a55652483af7840ec81c4200a2d0a9",
+  "video_state.asm": "a65e24b30dd7de563c3ecfc18789a1c18d7ca43c11ed4815caaccdaaa9549b13",
+  "arcade_fast.asm": "eb875f06331920e5cf5adaaa38be48300ca54e48613026089abbba57cc8b9388",
+  "title_screen.asm": "c520d10f38f781b0c7b5e5c323ac2f942dd4585aee83e6beeb11dc02b6ea1d04",
+  "boss_moai_v19.asm": "47320fab847595fd201d6a22c43cd700bdb5d92837a74d211eb97e00e600bded",
+  "stars_scroll_v13.asm": "b3006cb3ce16cb59fdd07db30f0aab3cf37cb8c37f4d1579faf34c755a6f2459",
+  "gameover_v20.asm": "1951334df39c5b045517f0428f9551cd1133d021de909dc03cf41a7d066f138f",
+  "arcade_rules_v18.asm": "ab31b2d08ec20964c036e901a67cd5fbace68d8193462452837d92705f4dedf1",
+  "arcade_compositor.asm": "fd7d8e5abe53ab883dd1a61f6e42e33e9be70b974d65973f1bc70b6bfcef84e7",
+  "gameplay.asm": "9ef80b0048806a257b57972d92d075af3363f4bf65a3be45a26ae5d37375e38b",
+  "sound_v19.asm": "edd522e240b53538d0a102f2d56e7b6f7f69c8b4892821f4ab4d4d8a625b9865",
+  "arcade_xor_fast.asm": "71551887c2e136e454c7908a425b10093cc8957a61a083807b737b9a725a56a9"
+}
