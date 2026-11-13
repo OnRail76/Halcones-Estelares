@@ -31,12 +31,19 @@ Arcade de seis oleadas por fase contra **CROW, HARPY, VULTURE y OSPREY**, antes 
 
 ## Descargas
 
-- [Releases oficiales](https://github.com/OnRail76/Halcones-Estelares/releases): ediciones ya publicadas. La v1.3.3 está disponible en el repositorio como [TAP](JUEGO/HALCONES_ESTELARES_1_3_3.tap) y [fuentes reproducibles](fuentes/1.3.3/README.md).
+- [Release oficial v1.3.3](https://github.com/OnRail76/Halcones-Estelares/releases/tag/v1.3.3): TAP, código fuente, manual, atlas y documentación completa.
 - [Fuentes de v1.3.3](fuentes/1.3.3/README.md) y [TAP original](JUEGO/HALCONES_ESTELARES_1_3_3.tap).
 - [Release v1.3.2](https://github.com/OnRail76/Halcones-Estelares/releases/tag/v1.3.2): cinco **carátulas aprobadas**, oficial ESF-01 negra y PDF históricos de la edición 1.0. **No modificar las carátulas ni colocarles número de versión.**
 - [Release v1.0](https://github.com/OnRail76/Halcones-Estelares/releases/tag/v1.0): primera edición y documentación visual original.
 
-Los PDF históricos no representan todos los ajustes de v1.3.3; el historial de cambios sí.
+## Documentación ilustrada actual (v1.3.3)
+
+- [Manual de instrucciones completo (PDF, 11 páginas)](docs/01_MANUAL_DE_INSTRUCCIONES_HALCONES_ESTELARES_v1.3.3.pdf), con la carátula en la primera página.
+- [Atlas visual y memoria técnica (PDF, 23 páginas)](docs/02_ATLAS_VISUAL_Y_MEMORIA_TECNICA_HALCONES_ESTELARES_v1.3.3.pdf), con el anexo **«Arcade Aviar»**.
+- [Paquete documental completo (ZIP)](https://github.com/OnRail76/Halcones-Estelares/releases/download/v1.3.3/HALCONES_ESTELARES_1_3_3_DOCUMENTACION_COMPLETA.zip), con capturas y sprites reales.
+
+Esta documentación corresponde a la **edición v1.3.3**. Los documentos ilustrados de la edición 1.0 siguen disponibles en las releases históricas v1.0/v1.3.2, pero ya no son la referencia vigente.
+
 
 ## Compilación e integridad
 

@@ -6,3 +6,6 @@ fuentes/1.3.3/*.patch -whitespace
 # Evitar falsos positivos de EOF sin alterar un solo byte del fuente.
 fuentes/1.3.3/src/v11_bajo.asm whitespace=-blank-at-eof
 fuentes/1.3.3/src/video.asm whitespace=-blank-at-eof
+
+# Manuales y atlas PDF: binarios, nunca diffs de texto.
+docs/*.pdf binary
