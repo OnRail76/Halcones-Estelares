@@ -6,7 +6,7 @@
 
 **ZX Spectrum 48K · Código máquina Z80 · © 2026 Tony C. Ware**
 
-**[DESCARGAR LA v1.3.3](https://github.com/OnRail76/Halcones-Estelares/releases/tag/v1.3.3)** · [TAP 1.3.3](JUEGO/HALCONES_ESTELARES_1_3_3.tap) · [Código fuente Z80 v1.3.3](fuentes/1.3.3/README.md)
+**[DESCARGAR TAP v1.3.3](JUEGO/HALCONES_ESTELARES_1_3_3.tap)** · [Releases oficiales](https://github.com/OnRail76/Halcones-Estelares/releases) · [Código fuente Z80 v1.3.3](fuentes/1.3.3/README.md)
 
 ## 1988. El futuro
 
@@ -31,7 +31,7 @@ Arcade de seis oleadas por fase contra **CROW, HARPY, VULTURE y OSPREY**, antes 
 
 ## Descargas
 
-- [Release v1.3.3](https://github.com/OnRail76/Halcones-Estelares/releases/tag/v1.3.3): TAP, paquete para jugar y código fuente reproducible.
+- [Releases oficiales](https://github.com/OnRail76/Halcones-Estelares/releases): ediciones ya publicadas. La v1.3.3 está disponible en el repositorio como [TAP](JUEGO/HALCONES_ESTELARES_1_3_3.tap) y [fuentes reproducibles](fuentes/1.3.3/README.md).
 - [Fuentes de v1.3.3](fuentes/1.3.3/README.md) y [TAP original](JUEGO/HALCONES_ESTELARES_1_3_3.tap).
 - [Release v1.3.2](https://github.com/OnRail76/Halcones-Estelares/releases/tag/v1.3.2): cinco **carátulas aprobadas**, oficial ESF-01 negra y PDF históricos de la edición 1.0. **No modificar las carátulas ni colocarles número de versión.**
 - [Release v1.0](https://github.com/OnRail76/Halcones-Estelares/releases/tag/v1.0): primera edición y documentación visual original.
