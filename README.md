@@ -34,7 +34,7 @@ Arcade de seis oleadas por fase contra **CROW, HARPY, VULTURE y OSPREY**, antes 
 - [**Única release definitiva v1.3.3**](https://github.com/OnRail76/Halcones-Estelares/releases/tag/v1.3.3): TAP, código fuente, manual, atlas, carátulas y archivo histórico.
 - [Fuentes de v1.3.3](fuentes/1.3.3/README.md) y [TAP original](JUEGO/HALCONES_ESTELARES_1_3_3.tap).
 - [**Carátula oficial original, sin modificación**](https://github.com/OnRail76/Halcones-Estelares/releases/download/v1.3.3/HALCONES_ESTELARES_CARATULA_OFICIAL.png) y [**cinco carátulas aprobadas**](https://github.com/OnRail76/Halcones-Estelares/releases/download/v1.3.3/HALCONES_ESTELARES_5_CARATULAS_APROBADAS.zip).
-- [**Archivo histórico completo**](https://github.com/OnRail76/Halcones-Estelares/releases/download/v1.3.3/HALCONES_ESTELARES_ARCHIVO_HISTORICO_COMPLETO.zip): manuales, atlas, carátulas y demás archivos originales de las primeras ediciones, con inventario SHA-256. Las versiones antiguas dejan de publicarse como releases independientes.
+- Se mantienen **exclusivamente los PDF definitivos** de manual y atlas v1.3.3, junto con la portada oficial y las cuatro alternativas aprobadas. No se publicará un archivo de documentación histórica.
 
 ## Documentación ilustrada actual (v1.3.3)
 
@@ -42,7 +42,7 @@ Arcade de seis oleadas por fase contra **CROW, HARPY, VULTURE y OSPREY**, antes 
 - [Atlas visual y memoria técnica (PDF, 23 páginas)](docs/02_ATLAS_VISUAL_Y_MEMORIA_TECNICA_HALCONES_ESTELARES_v1.3.3.pdf), con el anexo **«Arcade Aviar»**.
 - [Paquete documental completo (ZIP)](https://github.com/OnRail76/Halcones-Estelares/releases/download/v1.3.3/HALCONES_ESTELARES_1_3_3_DOCUMENTACION_COMPLETA.zip), con capturas y sprites reales.
 
-Esta documentación corresponde a la **edición definitiva v1.3.3**. Los PDF históricos no se eliminan: se conservan íntegros en el [archivo histórico](https://github.com/OnRail76/Halcones-Estelares/releases/download/v1.3.3/HALCONES_ESTELARES_ARCHIVO_HISTORICO_COMPLETO.zip).
+Esta es la **única documentación vigente y distribuida**. Se retiran los PDF y transcripciones de las ediciones obsoletas.
 
 
 ## Compilación e integridad
