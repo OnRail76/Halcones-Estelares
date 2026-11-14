@@ -34,15 +34,18 @@ Arcade de seis oleadas por fase contra **CROW, HARPY, VULTURE y OSPREY**, antes 
 - [**Única release definitiva v1.3.3**](https://github.com/OnRail76/Halcones-Estelares/releases/tag/v1.3.3): TAP, código fuente, manual, atlas, carátulas y archivo histórico.
 - [Fuentes de v1.3.3](fuentes/1.3.3/README.md) y [TAP original](JUEGO/HALCONES_ESTELARES_1_3_3.tap).
 - [**Carátula oficial original, sin modificación**](https://github.com/OnRail76/Halcones-Estelares/releases/download/v1.3.3/HALCONES_ESTELARES_CARATULA_OFICIAL.png) y [**cinco carátulas aprobadas**](https://github.com/OnRail76/Halcones-Estelares/releases/download/v1.3.3/HALCONES_ESTELARES_5_CARATULAS_APROBADAS.zip).
-- Se mantienen **exclusivamente los PDF definitivos** de manual y atlas v1.3.3, junto con la portada oficial y las cuatro alternativas aprobadas. No se publicará un archivo de documentación histórica.
+- Se distribuyen el **manual**, el **atlas completo revisado (43 páginas)** y **«Concepto Aviar» por separado (20 páginas)**. Se conservan la carátula oficial y las alternativas aprobadas; no se incorporan PDF de versiones antiguas.
 
 ## Documentación ilustrada actual (v1.3.3)
 
 - [Manual de instrucciones completo (PDF, 11 páginas)](docs/01_MANUAL_DE_INSTRUCCIONES_HALCONES_ESTELARES_v1.3.3.pdf), con la carátula en la primera página.
-- [Atlas visual y memoria técnica (PDF, 23 páginas)](docs/02_ATLAS_VISUAL_Y_MEMORIA_TECNICA_HALCONES_ESTELARES_v1.3.3.pdf), con el anexo **«Arcade Aviar»**.
+- [**Atlas visual y memoria técnica revisado (PDF, 43 páginas)**](docs/02_ATLAS_VISUAL_Y_MEMORIA_TECNICA_HALCONES_ESTELARES_v1.3.3.pdf), con **«Arcade Aviar»** corregido y el nuevo capítulo **«Concepto Aviar»**.
+- [**Concepto Aviar — libro de arte independiente (PDF, 20 páginas)**](docs/03_CONCEPTO_AVIAR_HALCONES_ESTELARES_v1.3.3.pdf), dedicado a 21 imágenes de bocetos, ilustraciones y conceptos originales. [Ficha editorial](docs/CONCEPTO_AVIAR.md).
+
+![Vista previa de Concepto Aviar](media/concepto-aviar-vista-previa.jpg)
 - [Paquete documental completo (ZIP)](https://github.com/OnRail76/Halcones-Estelares/releases/download/v1.3.3/HALCONES_ESTELARES_1_3_3_DOCUMENTACION_COMPLETA.zip), con capturas y sprites reales.
 
-Esta es la **única documentación vigente y distribuida**. Se retiran los PDF y transcripciones de las ediciones obsoletas.
+La documentación vigente en `main` es el **manual de v1.3.3**, el **atlas revisado** y su **sección conceptual independiente**. Los adjuntos anteriores de la release v1.3.3 se mantienen como archivos históricos sin tocar el TAP, las fuentes, las etiquetas ni la publicación original.
 
 
 ## Compilación e integridad
