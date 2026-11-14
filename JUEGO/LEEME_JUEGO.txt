@@ -12,5 +12,5 @@ Seis oleadas y jefe MOAI por fase. Primera formación de 10 CROW.
 v1.3.3: beeper a golpes, 16 estrellas, sin fondos lejanos (Júpiter y luna se mantienen).
 
 SHA-256 DEL TAP: 0db551592d01900287f0dad4754b840589075fb50ae3e7405ea66dbf21266ddf
-ARTES Y PDF: conserva las carátulas aprobadas y los PDF históricos de la release v1.3.2.
-https://github.com/OnRail76/Halcones-Estelares/releases/tag/v1.3.2
+ARTES Y PDF: solo el manual y el atlas finales v1.3.3 y las carátulas aprobadas; no se conserva documentación obsoleta. La carátula oficial no se modifica.
+https://github.com/OnRail76/Halcones-Estelares/releases/tag/v1.3.3

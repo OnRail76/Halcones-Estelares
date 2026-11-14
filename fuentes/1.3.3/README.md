@@ -71,4 +71,4 @@ python3 -m pytest -q
 
 Autor y dirección creativa: **Tony C. Ware**, 2026. Asistencia IA: **OpenAI GPT y Anthropic Claude**. Código y herramientas bajo licencia **MIT asistida por IA**, con textos en `LICENSE` y `LICENSE_ES.md`. Los gráficos, ilustraciones, logotipos, carátulas y recursos visuales originales **no** se publican bajo MIT: `LICENCIA_GRAFICOS.md`.
 
-Portadas oficiales y documentación PDF histórica se preservan en la [release v1.3.2](https://github.com/OnRail76/Halcones-Estelares/releases/tag/v1.3.2); los PDF corresponden a la edición original 1.0, NO describen los cambios de 1.3.3. No redibujar ni reemplazar las carátulas al actualizar el código.
+La **única release final v1.3.3** reúne el manual y el atlas actualizados, la [carátula oficial original](https://github.com/OnRail76/Halcones-Estelares/releases/download/v1.3.3/HALCONES_ESTELARES_CARATULA_OFICIAL.png) y las cuatro alternativas aprobadas. No se conservan ni redistribuyen PDF y documentos obsoletos. La portada oficial no se ha redibujado ni reemplazado.
