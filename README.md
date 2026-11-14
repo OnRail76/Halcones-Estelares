@@ -59,3 +59,11 @@ La documentación vigente en `main` es el **manual de v1.3.3**, el **atlas revis
 **Autor y dirección creativa: Tony C. Ware.** Asistencia IA: OpenAI GPT y Anthropic Claude. Código y herramientas: MIT asistida por IA ([inglés](LICENSE), [castellano](LICENSE_ES.md)). Gráficos, sprites, logos y carátulas: [derechos reservados](LICENCIA_GRAFICOS.md).
 
 **¡Sus gritos se oirán en el Cosmos!**
+
+<!-- ANEXO_PROGRAMAS_UTILIZADOS:INICIO -->
+## Programas utilizados — anexo documental
+
+Los **manuales de instrucciones y atlas visuales** incorporan, como **última página**, el anexo común **«Programas utilizados»**, con las aplicaciones, emuladores y servicios citados por el autor. [Consultar el inventario y sus enlaces](docs/ANEXO_PROGRAMAS_UTILIZADOS.md).
+
+Esta es una actualización **exclusivamente documental**: no altera los juegos, sus fuentes, ni las etiquetas o versiones publicadas.
+<!-- ANEXO_PROGRAMAS_UTILIZADOS:FIN -->
