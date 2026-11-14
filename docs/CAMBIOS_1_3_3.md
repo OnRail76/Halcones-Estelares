@@ -23,7 +23,7 @@
 - `HALCONES_ESTELARES_1_3_3_CODIGO_FUENTE_REVISADO.zip`: fuentes Z80, recursos originales, herramientas, licencias y tests.
 - `HALCONES_ESTELARES_1_3_3_KIT_PUBLICACION.zip`: documentos de publicación, paquetes y actualización preparada para el repositorio.
 
-**Carátulas y atlas:** la [carátula oficial original](https://github.com/OnRail76/Halcones-Estelares/releases/download/v1.3.3/HALCONES_ESTELARES_CARATULA_OFICIAL.png) se conserva sin alteración, junto a [las cinco carátulas aprobadas](https://github.com/OnRail76/Halcones-Estelares/releases/download/v1.3.3/HALCONES_ESTELARES_5_CARATULAS_APROBADAS.zip). Los PDF de las primeras ediciones se preservan íntegros en el [archivo histórico de v1.3.3](https://github.com/OnRail76/Halcones-Estelares/releases/download/v1.3.3/HALCONES_ESTELARES_ARCHIVO_HISTORICO_COMPLETO.zip), no como documentación técnica actualizada. La edición v1.3.3 dispone de manual y atlas vigentes en la propia release.
+**Carátulas y atlas:** la [carátula oficial original](https://github.com/OnRail76/Halcones-Estelares/releases/download/v1.3.3/HALCONES_ESTELARES_CARATULA_OFICIAL.png) se conserva sin alteración, junto a [las cinco carátulas aprobadas](https://github.com/OnRail76/Halcones-Estelares/releases/download/v1.3.3/HALCONES_ESTELARES_5_CARATULAS_APROBADAS.zip). Los PDF obsoletos de las ediciones anteriores se retiran. **Solo** se distribuyen el [manual](01_MANUAL_DE_INSTRUCCIONES_HALCONES_ESTELARES_v1.3.3.pdf) y el [atlas](02_ATLAS_VISUAL_Y_MEMORIA_TECNICA_HALCONES_ESTELARES_v1.3.3.pdf) definitivos, además de la carátula oficial y las alternativas aprobadas, sin modificaciones.
 
 ## Verificación
 
