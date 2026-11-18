@@ -5,5 +5,5 @@ __pycache__/
 *.swp
 *.bak
 *.tmp
-build/.cache/
-fuentes/1.3.3/build/
+fuentes/1.4/build/*
+!fuentes/1.4/build/README.md

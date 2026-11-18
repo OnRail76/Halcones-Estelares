@@ -1,0 +1,17 @@
+ASSET_BUILD: 5 authentic 1bpp sprites + AND masks / deterministic ASM / 8x8 attribute colors
+3 original ESF enemy silhouettes x 2 frames, native monochrome data, attributes Yellow/Red/Cyan
+FAST ARCADE ASSETS: ESF fixed frame + 3 ORIGINAL two-frame enemies + shield/explosion, XOR shots, 8 shifts
+PASS ESF graphic sourced from uploaded image, 1442 native pixels.
+PASS 192 8x8 attribute cells, ZERO color collisions; HUD occupies 64x192.
+TITLE: V2.7 original logo and completed hawk, native SCR 3073 bytes RLE
+MOAI user asset (207, 195, 626, 1030) => 48 88 528 bytes
+JUPITER native asset 392 bytes
+GAME OVER native SCR 6912 RLE supplement 1619 bytes
+FASE SCR= 6912 Z80-RLE= 946 bytes; rendered /mnt/data/_halcones14_clean/build/V24_FASE_02_PREVIEW.png
+FRAME: 384 bitmap bytes, 48 native attributes, two reserved character columns
+LOW SPRITES @ $6000 .. $7E1F, 7712 bytes; Crow 3264..7712
+V12 LZ: titulo 2684, fase 964, HUD 736, game over 1391 bytes
+EXTRAS: F401..FD8D (2445 bytes); libres hasta FDF9: 107
+MEMORIA BAJA: 76E0..7EE0 (2049 bytes); libres hasta 7FFF: 287
+BLOQUE PRINCIPAL: 8000..BF27; libres hasta BFFF: 216
+ASSEMBLED 16168 bytes; SHA256=7c595b9d7f61cba9145ce6a16e883ca0653750ac52a3cc2845066045967d1cad

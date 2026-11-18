@@ -1,16 +1,13 @@
-HALCONES ESTELARES — EDICIÓN v1.3.3 — ZX SPECTRUM 48K
+HALCONES ESTELARES — EDICIÓN DEFINITIVA 1.4 — ZX SPECTRUM 48K
 © 2026 Tony C. Ware
 
-CARGA: Abre HALCONES_ESTELARES_1_3_3.tap en Fuse u otro emulador configurado como ZX Spectrum 48K.
+Carga HALCONES_ESTELARES_1_4.tap en Fuse o Spectrum 48K.
+O/P mover; ESPACIO disparar (por pulsación); A o Q escudo; H pausa.
+Sinclair: 6/7 mover, 0 disparar, 8/9 escudo.
+Kempston: FIRE en el título para comenzar con joystick.
 
-CONTROLES: O / P mover, ESPACIO disparar e iniciar partida; A o Q escudo; H pausa.
-SINCLAIR: 6 / 7 mover, 0 disparar, 8 o 9 escudo.
-KEMPSTON: iniciar desde el título con FIRE para usar joystick.
+Seis oleadas y un MOAI por fase; seis estilos de ataque, cuatro especies de aves y cinco ataques del MOAI.
+Lee docs/HALCONES_ESTELARES_1_4_LIBRO_DEL_JUEGO.pdf para todos los detalles.
 
-CROW · HARPY · VULTURE · OSPREY · MOAI MONOLITH.
-Seis oleadas y jefe MOAI por fase. Primera formación de 10 CROW.
-v1.3.3: beeper a golpes, 16 estrellas, sin fondos lejanos (Júpiter y luna se mantienen).
-
-SHA-256 DEL TAP: 0db551592d01900287f0dad4754b840589075fb50ae3e7405ea66dbf21266ddf
-ARTES Y PDF: solo el manual y el atlas finales v1.3.3 y las carátulas aprobadas; no se conserva documentación obsoleta. La carátula oficial no se modifica.
-https://github.com/OnRail76/Halcones-Estelares/releases/tag/v1.3.3
+SHA-256: 7c595b9d7f61cba9145ce6a16e883ca0653750ac52a3cc2845066045967d1cad
+https://github.com/OnRail76/Halcones-Estelares/releases/tag/v1.4
